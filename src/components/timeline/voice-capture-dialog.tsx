@@ -44,10 +44,39 @@ export function VoiceCaptureDialog({ open, onOpenChange }: VoiceCaptureDialogPro
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data)
       }
-      recorder.onstop = async () => {
+      recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
         stream.getTracks().forEach((t) => t.stop())
-        await transcribeAndParse(blob)
+        setTranscribing(true)
+        const reader = new FileReader()
+        reader.onloadend = async () => {
+          const dataUrl = reader.result as string
+          try {
+            const r = await fetch('/api/voice-capture', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ audio: dataUrl, create: false }),
+            })
+            const j = await r.json()
+            if (j.error) {
+              toast.error(j.error)
+            } else {
+              setTranscript(j.transcript)
+              setDetectedLanguage(j.detectedLanguage)
+              setParsedEvent(j.event)
+              setEditingTitle(j.event.title)
+              toast.success('Speech processed — review the event below')
+            }
+          } catch {
+            toast.error('Failed to process audio')
+          }
+          setTranscribing(false)
+        }
+        reader.onerror = () => {
+          toast.error('Failed to read audio')
+          setTranscribing(false)
+        }
+        reader.readAsDataURL(blob)
       }
       recorder.start()
       mediaRecorderRef.current = recorder
@@ -63,36 +92,6 @@ export function VoiceCaptureDialog({ open, onOpenChange }: VoiceCaptureDialogPro
     mediaRecorderRef.current?.stop()
     setRecording(false)
   }, [])
-
-  const transcribeAndParse = async (blob: Blob) => {
-    setTranscribing(true)
-    try {
-      const reader = new FileReader()
-      reader.onloadend = async () => {
-        const dataUrl = reader.result as string
-        const r = await fetch('/api/voice-capture', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ audio: dataUrl, create: false }),
-        })
-        const j = await r.json()
-        if (j.error) {
-          toast.error(j.error)
-        } else {
-          setTranscript(j.transcript)
-          setDetectedLanguage(j.detectedLanguage)
-          setParsedEvent(j.event)
-          setEditingTitle(j.event.title)
-          toast.success('Speech processed — review the event below')
-        }
-        setTranscribing(false)
-      }
-      reader.readAsDataURL(blob)
-    } catch {
-      toast.error('Failed to process audio')
-      setTranscribing(false)
-    }
-  }
 
   const confirmCreate = async () => {
     if (!parsedEvent) return

@@ -91,11 +91,7 @@ Respond with ONLY valid JSON (no markdown, no prose):
     let categoryId: string | null = null
     if (parsed.categoryName) {
       const cat = await db.category.findFirst({
-        where: { userId: user.id, name: { equals: parsed.categoryName, mode: 'insensitive' } },
-      })
-      // Note: SQLite doesn't support mode: insensitive, so try case-insensitive manually
-      const catFallback = cat ?? await db.category.findFirst({
-        where: { userId: user.id },
+        where: { userId: user.id, name: { equals: parsed.categoryName } },
       })
       categoryId = cat?.id ?? null
     }

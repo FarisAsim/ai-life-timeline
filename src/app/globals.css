@@ -120,3 +120,35 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* RTL support for Egyptian Arabic */
+html[dir="rtl"] {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+html[dir="rtl"] .ltr-only {
+  display: none;
+}
+
+/* Mobile: prevent text size adjust */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Safe area for mobile */
+body {
+  padding-top: env(safe-area-inset-top);
+}
+
+/* Smooth scrolling for mobile */
+main {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Prevent zoom on input focus (iOS) */
+input, textarea, select {
+  font-size: 16px;
+}
+

@@ -101,6 +101,7 @@ export function TimelineView() {
         }}
         scanning={detectGaps.isPending}
         onAdd={() => setCreating(true)}
+        onVoiceCapture={() => setVoiceCapture(true)}
       />
 
       {/* Hour-by-hour visual bar */}
@@ -133,6 +134,7 @@ export function TimelineView() {
       )}
 
       <EventFormDialog open={creating} onOpenChange={setCreating} />
+      <VoiceCaptureDialog open={voiceCapture} onOpenChange={setVoiceCapture} />
       <ResolutionDialog block={resolving} open={!!resolving} onOpenChange={(v) => !v && setResolving(null)} />
     </div>
   )
@@ -149,6 +151,7 @@ function DaySummary({
   onScan,
   scanning,
   onAdd,
+  onVoiceCapture,
 }: {
   date: Date
   eventCount: number
@@ -160,6 +163,7 @@ function DaySummary({
   onScan: () => void
   scanning: boolean
   onAdd: () => void
+  onVoiceCapture: () => void
 }) {
   const hours = (trackedMinutes / 60).toFixed(1)
   const awakeMinutes = today
@@ -223,6 +227,15 @@ function DaySummary({
           <Button variant="outline" size="sm" onClick={onScan} disabled={scanning}>
             <ScanLine className="mr-1.5 h-3.5 w-3.5" />
             {scanning ? 'Scanning…' : 'Scan for gaps'}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onVoiceCapture}
+            className="border-violet-500/40 text-violet-700 hover:bg-violet-500/10 dark:text-violet-300"
+          >
+            <Mic className="mr-1.5 h-3.5 w-3.5" />
+            Speak
           </Button>
           <QuickAddButton date={dateISO} />
           <Button size="sm" onClick={onAdd} className="bg-emerald-600 hover:bg-emerald-700">
