@@ -124,6 +124,8 @@ export interface InsightData {
   completenessPercentage: number
   topHabits: { patternKey: string; categoryId: string | null; frequency: number; confidence: number }[]
   weeklySummary: string
+  tagBreakdown: { tag: string; minutes: number; percentage: number; eventCount: number }[]
+  streakDays: number
 }
 
 export interface CompanionActionResult {

@@ -1,11 +1,13 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getDemoUser } from '@/lib/services/demo-user'
 import { db } from '@/lib/db'
 import { format } from 'date-fns'
 
 // Data export — right to be informed / portability (PRD §9)
-export async function GET() {
+// Supports JSON (full) and CSV (events only) via ?format=csv
+export async function GET(req: NextRequest) {
   const user = await getDemoUser()
+  const formatParam = req.nextUrl.searchParams.get('format') ?? 'json'
 
   const [events, blocks, categories, conversations, notifications, habits] = await Promise.all([
     db.timelineEvent.findMany({ where: { userId: user.id }, orderBy: { startTime: 'desc' } }),
@@ -16,6 +18,41 @@ export async function GET() {
     db.habitPattern.findMany({ where: { userId: user.id } }),
   ])
 
+  const catMap = new Map(categories.map((c) => [c.id, c.name]))
+
+  // CSV export — events only, spreadsheet-friendly
+  if (formatParam === 'csv') {
+    const headers = ['Date', 'Start Time', 'End Time', 'Duration (min)', 'Title', 'Category', 'Location', 'Tags', 'Source', 'Confidence', 'Description', 'Notes']
+    const rows = events.map((e) => {
+      const startDate = new Date(e.startTime)
+      const endDate = new Date(e.endTime)
+      const row = [
+        format(startDate, 'yyyy-MM-dd'),
+        format(startDate, 'HH:mm'),
+        format(endDate, 'HH:mm'),
+        String(e.durationMinutes),
+        csvEscape(e.title),
+        csvEscape(catMap.get(e.categoryId ?? '') ?? ''),
+        csvEscape(e.location ?? ''),
+        csvEscape(e.tags ?? ''),
+        e.source,
+        String(Math.round(e.confidenceScore * 100)) + '%',
+        csvEscape(e.description ?? ''),
+        csvEscape(e.notes ?? ''),
+      ]
+      return row.join(',')
+    })
+    const csv = [headers.join(','), ...rows].join('\n')
+    const filename = `life-timeline-events-${format(new Date(), 'yyyy-MM-dd')}.csv`
+    return new NextResponse(csv, {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+      },
+    })
+  }
+
+  // JSON export — full data (default)
   const exportData = {
     exportedAt: new Date().toISOString(),
     user: {
@@ -43,6 +80,7 @@ export async function GET() {
       durationMinutes: e.durationMinutes,
       location: e.location,
       notes: e.notes,
+      tags: e.tags ? e.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
       categoryId: e.categoryId,
       confidenceScore: e.confidenceScore,
       source: e.source,
@@ -101,4 +139,13 @@ export async function GET() {
       'Content-Disposition': `attachment; filename="${filename}"`,
     },
   })
+}
+
+function csvEscape(value: string): string {
+  if (!value) return ''
+  // Wrap in quotes if contains comma, quote, or newline; escape internal quotes
+  if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+    return `"${value.replace(/"/g, '""')}"`
+  }
+  return value
 }

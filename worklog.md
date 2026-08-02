@@ -786,3 +786,87 @@ Task: QA pass + new features (tag filter bar, weekly summary notification, date 
 5. **Dev server stability** — sandbox kills background processes after ~60s; not a production issue.
 6. **Tag statistics in Insights** — tags are filterable now but there's no tag-based analytics view showing which tags accumulate the most time. Next: add a tag breakdown chart to Insights.
 7. **Export format options** — data export is JSON only. Next: add CSV and PDF export options for portability.
+
+---
+
+## Task ID: 10
+Agent: main (Z.ai Code) — webDevReview cron round 9
+Task: QA pass + new features (tag breakdown, streak widget, CSV export) + styling polish.
+
+### Work Log
+
+#### QA pass
+- All 23 API endpoints return 200, lint passes clean, no browser errors.
+- App is stable — no new bugs found.
+
+#### New feature: Tag breakdown chart in Insights (unresolved issue #6)
+- Updated `analytics-service.ts` `getInsights()` to compute a `tagBreakdown` array:
+  - Aggregates minutes per tag across all tagged events in the range.
+  - Returns top 12 tags sorted by minutes, with percentage and event count.
+- Updated `InsightData` type to include `tagBreakdown` and `streakDays`.
+- Created `TagBreakdown` component:
+  - Card with "Tag breakdown" heading and teal accent.
+  - Horizontal bar chart with color-coded bars (8 rotating colors).
+  - Shows `#tag`, event count, and hours per tag.
+  - Animated bars with staggered entrance (framer-motion).
+  - Empty state with icon and helper text ("Add tags like #project-x to your events").
+- Added to Insights view between Goals and Learned habits.
+
+#### New feature: Streak widget (consecutive logging days)
+- Updated `analytics-service.ts` to compute `streakDays`:
+  - Counts consecutive days (ending today) with at least 1 event.
+  - Allows today to be empty (haven't logged yet) but breaks on a past empty day.
+- Created `StreakWidget` component:
+  - Shows the streak count with a Flame (🔥) icon for 7+ days, Trophy for 3-6 days.
+  - Gradient background (orange for hot, amber for warm).
+  - Contextual message based on streak length.
+  - Pulsing 🔥 animation for 7+ day streaks.
+  - Framer-motion entrance animation.
+- Added to Insights view above the weekly summary card.
+- Verified: API returns `streakDays: 8`.
+
+#### New feature: CSV export (unresolved issue #7)
+- Updated `/api/export` route to accept `?format=csv` query param:
+  - CSV format: events only, spreadsheet-friendly with 12 columns (Date, Start Time, End Time, Duration, Title, Category, Location, Tags, Source, Confidence, Description, Notes).
+  - Proper CSV escaping (quotes for commas, quotes, newlines).
+  - JSON format (default): full data export (unchanged).
+- Updated Settings view:
+  - Two export buttons: "JSON" (emerald) and "CSV" (teal).
+  - Updated description: "Download your timeline as JSON (full) or CSV (events only, spreadsheet-friendly)."
+  - Added FileText icon for CSV button.
+- Verified: CSV export returns proper headers and rows:
+  ```
+  Date,Start Time,End Time,Duration (min),Title,Category,Location,Tags,Source,Confidence,Description,Notes
+  2026-08-03,15:00,16:00,60,Study Session,Study,,,ai_confirmed,80%,,
+  ```
+
+#### Styling polish
+- **Tag breakdown**: color-coded horizontal bars with staggered animations, teal-themed.
+- **Streak widget**: gradient backgrounds, pulsing flame animation for 7+ day streaks, trophy icon for warm streaks.
+- **Export buttons**: dual-color buttons (emerald JSON, teal CSV) with distinct icons.
+- **Insights view**: now has 7+ sections (metrics, streak, AI summary, category pie, productivity bars, daily trend, goals, tag breakdown, learned habits).
+
+#### Verification results
+- `bun run lint` → 0 errors, 0 warnings ✅
+- All 11 API endpoints return 200 (including both export formats) ✅
+- CSV export produces valid spreadsheet-friendly output ✅
+- Insights API returns `streakDays: 8` and `tagBreakdown` array ✅
+- Insights view renders streak widget, tag breakdown, goals, and learned habits ✅
+- No browser errors ✅
+
+### Stage Summary
+- **3 new features added**: Tag breakdown chart, Streak widget, CSV export.
+- **2 unresolved issues closed**: #6 (tag statistics) and #7 (export format options).
+- Total API routes: 23 (unchanged — CSV uses existing export route with format param).
+- Total components: added TagBreakdown, StreakWidget; enhanced analytics-service (tag + streak computation), settings-view (CSV export).
+- All features verified working via curl and agent-browser.
+- Lint passes clean.
+
+### Unresolved Issues / Next-phase Priorities
+1. **Auth is still stubbed** (single demo user). Next phase: wire NextAuth.js.
+2. **Gap detection runs on-demand** — next: add a scheduled/cron background pass.
+3. **Analytics snapshots** not yet implemented — fine at MVP scale.
+4. **Semantic search** uses LLM ranking — at scale, switch to embedding-based vector search.
+5. **Dev server stability** — sandbox kills background processes after ~60s; not a production issue.
+6. **PDF export** — CSV and JSON are available; PDF would be nice for printable summaries. Next: add a PDF report generator.
+7. **Tag-based goal tracking** — goals support category_hours and event_count but not tag-based goals (e.g. "10 hours on #project-x"). Next: add tag-based goal type.

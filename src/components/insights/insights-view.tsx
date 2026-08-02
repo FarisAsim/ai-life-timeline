@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { useInsights } from '@/hooks/use-data'
 import { Card } from '@/components/ui/card'
 import { GoalsWidget } from './goals-widget'
+import { TagBreakdown } from './tag-breakdown'
+import { StreakWidget } from './streak-widget'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { CategoryBadge, CategoryDot } from '@/components/category-icon'
@@ -99,6 +101,9 @@ export function InsightsView() {
           tone="teal"
         />
       </div>
+
+      {/* Streak widget */}
+      <StreakWidget streakDays={data.streakDays} />
 
       {/* Weekly summary card */}
       <Card className="border-0 bg-gradient-to-br from-violet-500/10 via-fuchsia-500/5 to-transparent">
@@ -221,6 +226,9 @@ export function InsightsView() {
 
       {/* Goals */}
       <GoalsWidget />
+
+      {/* Tag breakdown */}
+      <TagBreakdown tags={data.tagBreakdown} />
 
       {/* Learned habits */}
       <Card className="p-5">

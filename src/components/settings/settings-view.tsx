@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import {
-  User, Clock, Download, Trash2, Database, Shield, Sparkles, Loader2, Check, Globe, Bell,
+  User, Clock, Download, Trash2, Database, Shield, Sparkles, Loader2, Check, Globe, Bell, FileText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -62,9 +62,14 @@ function SettingsBody({ data }: { data: { user: { id: string; name: string | nul
     )
   }
 
-  const handleExport = () => {
-    window.location.href = '/api/export'
-    toast.success('Export started — check your downloads')
+  const handleExportJson = () => {
+    window.location.href = '/api/export?format=json'
+    toast.success('JSON export started — check your downloads')
+  }
+
+  const handleExportCsv = () => {
+    window.location.href = '/api/export?format=csv'
+    toast.success('CSV export started — check your downloads')
   }
 
   const handleDelete = () => {
@@ -147,13 +152,19 @@ function SettingsBody({ data }: { data: { user: { id: string; name: string | nul
               </div>
               <div>
                 <div className="text-sm font-medium">Export all data</div>
-                <p className="text-xs text-muted-foreground">Download a JSON file with every event, gap, conversation, and habit.</p>
+                <p className="text-xs text-muted-foreground">Download your timeline as JSON (full) or CSV (events only, spreadsheet-friendly).</p>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={handleExport} className="shrink-0">
-              <Download className="mr-1.5 h-3.5 w-3.5" />
-              Export
-            </Button>
+            <div className="flex shrink-0 gap-1.5">
+              <Button variant="outline" size="sm" onClick={handleExportJson}>
+                <Download className="mr-1.5 h-3.5 w-3.5" />
+                JSON
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleExportCsv} className="border-teal-500/30 text-teal-700 hover:bg-teal-500/10 dark:text-teal-300">
+                <FileText className="mr-1.5 h-3.5 w-3.5" />
+                CSV
+              </Button>
+            </div>
           </div>
 
           <div className="flex flex-col gap-3 rounded-lg border border-rose-500/20 bg-rose-500/5 p-3 sm:flex-row sm:items-center sm:justify-between">

@@ -90,6 +90,48 @@ export async function getInsights(userId: string, rangeDays = 30): Promise<Insig
     .slice(0, 5)
     .map((h) => ({ patternKey: h.patternKey, categoryId: h.categoryId, frequency: h.frequency, confidence: h.confidence }))
 
+  // Tag breakdown — aggregate minutes per tag across all tagged events
+  const tagMinutes = new Map<string, { minutes: number; count: number }>()
+  for (const ev of events) {
+    if (!ev.tags) continue
+    const tags = ev.tags.split(',').map((t) => t.trim()).filter(Boolean)
+    for (const tag of tags) {
+      const existing = tagMinutes.get(tag)
+      if (existing) {
+        existing.minutes += ev.durationMinutes
+        existing.count += 1
+      } else {
+        tagMinutes.set(tag, { minutes: ev.durationMinutes, count: 1 })
+      }
+    }
+  }
+  const tagBreakdown = Array.from(tagMinutes.entries())
+    .map(([tag, { minutes, count }]) => ({
+      tag,
+      minutes,
+      percentage: totalTrackedMinutes > 0 ? minutes / totalTrackedMinutes : 0,
+      eventCount: count,
+    }))
+    .sort((a, b) => b.minutes - a.minutes)
+    .slice(0, 12)
+
+  // Streak — consecutive days with at least 1 event
+  const daySet = new Set<string>()
+  for (const ev of events) {
+    daySet.add(format(ev.startTime, 'yyyy-MM-dd'))
+  }
+  let streakDays = 0
+  const today = new Date()
+  for (let i = 0; i < rangeDays; i++) {
+    const checkDay = format(subDays(today, i), 'yyyy-MM-dd')
+    if (daySet.has(checkDay)) {
+      streakDays++
+    } else if (i > 0) {
+      // Allow today to be empty (haven't logged yet) but break on a past empty day
+      break
+    }
+  }
+
   // Weekly summary text
   const weeklySummary = generateWeeklySummary(categoryBreakdown, completenessPercentage, totalTrackedMinutes)
 
@@ -101,6 +143,8 @@ export async function getInsights(userId: string, rangeDays = 30): Promise<Insig
     completenessPercentage,
     topHabits,
     weeklySummary,
+    tagBreakdown,
+    streakDays,
   }
 }
 
