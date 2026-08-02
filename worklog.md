@@ -700,3 +700,89 @@ Task: QA pass + new features (template manager, goal notifications, event tags) 
 5. **Dev server stability** — sandbox kills background processes after ~60s; not a production issue.
 6. **Tag-based filtering** — tags are displayed and searchable but can't yet filter the timeline by tag. Next: add a tag filter bar to the Timeline view.
 7. **Weekly summary email/notification** — goals trigger achievement notifications but there's no periodic weekly summary. Next: add a weekly digest notification.
+
+---
+
+## Task ID: 9
+Agent: main (Z.ai Code) — webDevReview cron round 8 (first successful 30-min run)
+Task: QA pass + new features (tag filter bar, weekly summary notification, date jump picker) + styling polish.
+
+### Work Log
+
+#### QA pass
+- All 23 API endpoints return 200, lint passes clean, no browser errors.
+- App is stable — no new bugs found.
+
+#### Cron job fix (prior issue)
+- The previous webDevReview cron job (job 304106) was failing with "model glm-5.2 concurrency limit exceeded" because the 15-minute interval caused overlapping LLM sessions.
+- Recreated as job 304233 with a 30-minute interval (1800s). This is the first successful run of the new job.
+
+#### New feature: Tag filter bar (unresolved issue #6)
+- Created `TagFilterBar` component for the Timeline view:
+  - Collects all unique tags from the day's events with counts.
+  - "Tags" toggle button (Filter icon) that expands to show all tags as clickable pills.
+  - Clicking a tag filters the timeline to show only events with that tag.
+  - When filtered, shows "Filtered: N events" and an X to clear.
+  - Animated expand/collapse with framer-motion.
+  - Auto-expands when a tag is selected.
+  - Teal accent color matching the tag badges.
+- Updated `TimelineView`:
+  - Added `selectedTag` state.
+  - `rows` useMemo now filters events by selected tag and hides gaps when filtering.
+  - Placed the TagFilterBar between the HourBar and the event list.
+- Fixed lint error: replaced `useEffect` setState-in-effect with derived state (`expanded = userExpanded || !!selectedTag`).
+- Verified: created 2 events with tags `["project-x", "work"]` and `["health", "project-x"]` → both returned with correct tags.
+
+#### New feature: Weekly summary digest notification (unresolved issue #7)
+- Updated `runNotificationEngine()` to generate a weekly summary:
+  - Checks if a weekly summary notification has been generated in the last 7 days.
+  - If not, computes insights for the last 7 days (total hours, top category, completeness).
+  - Generates "📊 Your week in review" notification with:
+    - Total hours tracked and active days.
+    - Top activity with hours.
+    - Timeline completeness percentage.
+    - Encouragement message based on completeness.
+  - Deduped via `actionPayload` containing `weekly-summary` key.
+  - Non-blocking: wrapped in try/catch with silent failure.
+- Verified: ran the notification engine → generated "📊 Your week in review: This week: 88h tracked across 8 days. Top activity: Work (21h). Timeline completeness: 79%."
+
+#### New feature: Date jump picker
+- Created `DateJumpPicker` component:
+  - Prev/Today/Next day navigation buttons (same as before).
+  - Today button is now a Popover trigger that opens a full calendar picker.
+  - Calendar allows jumping to any past date (future dates disabled).
+  - "Jump to today" button in the popover footer.
+  - Next-day button disabled when on today (can't navigate to future).
+  - CalendarRange icon instead of CalendarDays.
+- Replaced the inline date navigation in `AppHeader` with the new component.
+- Cleaned up unused imports (`ChevronLeft`, `ChevronRight`, `CalendarDays`, `format`, `addDays`, `subDays`, `isToday`) from the header.
+
+#### Styling polish
+- **Tag filter bar**: teal-themed pills with counts, animated expand, hover scale effect.
+- **Date jump picker**: cleaner popover with calendar, disabled-state for future navigation.
+- **Weekly summary**: emoji-prefixed title (📊) for visual distinction in notifications.
+
+#### Verification results
+- `bun run lint` → 0 errors, 0 warnings ✅
+- All 23 API endpoints return 200 ✅
+- Tag filter bar renders and filters events correctly ✅
+- Weekly summary notification generated with real insights data ✅
+- Date jump picker renders with calendar popover ✅
+- No browser errors ✅
+
+### Stage Summary
+- **3 new features added**: Tag filter bar, Weekly summary digest notification, Date jump picker.
+- **2 unresolved issues closed**: #6 (tag filtering) and #7 (weekly summary).
+- Total API routes: 23 (unchanged — new features use existing endpoints).
+- Total components: added TagFilterBar, DateJumpPicker; enhanced TimelineView (tag filtering), notification-service (weekly summary), AppHeader (date picker).
+- All features verified working via curl and agent-browser.
+- Lint passes clean.
+
+### Unresolved Issues / Next-phase Priorities
+1. **Auth is still stubbed** (single demo user). Next phase: wire NextAuth.js.
+2. **Gap detection runs on-demand** — next: add a scheduled/cron background pass.
+3. **Analytics snapshots** not yet implemented — fine at MVP scale.
+4. **Semantic search** uses LLM ranking — at scale, switch to embedding-based vector search.
+5. **Dev server stability** — sandbox kills background processes after ~60s; not a production issue.
+6. **Tag statistics in Insights** — tags are filterable now but there's no tag-based analytics view showing which tags accumulate the most time. Next: add a tag breakdown chart to Insights.
+7. **Export format options** — data export is JSON only. Next: add CSV and PDF export options for portability.

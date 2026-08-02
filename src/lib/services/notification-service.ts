@@ -1,7 +1,8 @@
 import { db } from '@/lib/db'
-import { format } from 'date-fns'
+import { format, subDays } from 'date-fns'
 import { listOpenBlocks } from './gap-detection-service'
 import { listGoals } from './goal-service'
+import { getInsights } from './analytics-service'
 
 export interface CreateNotificationInput {
   userId: string
@@ -146,6 +147,48 @@ export async function runNotificationEngine(userId: string) {
         })
         created.push(n)
       }
+    }
+  }
+
+  // Weekly summary digest (once per week)
+  const weekSummaryKey = `weekly-summary-${format(now, 'yyyy-MM-dd')}`
+  const lastSummary = await db.notification.findFirst({
+    where: {
+      userId,
+      type: 'insight',
+      actionPayload: { contains: 'weekly-summary' },
+    },
+    orderBy: { createdAt: 'desc' },
+  })
+  // Generate if no summary exists in the last 7 days
+  const weekAgoTime = now.getTime() - 7 * 24 * 60 * 60 * 1000
+  if (!lastSummary || lastSummary.createdAt.getTime() < weekAgoTime) {
+    try {
+      const insights = await getInsights(userId, 7)
+      const topCat = insights.categoryBreakdown[0]
+      const topCatName = topCat?.category?.name ?? 'Uncategorized'
+      const topCatHours = topCat ? Math.round(topCat.minutes / 60 * 10) / 10 : 0
+      const totalHours = Math.round(insights.totalTrackedMinutes / 60)
+      const completeness = insights.completenessPercentage
+
+      const parts: string[] = []
+      parts.push(`This week: ${totalHours}h tracked across ${insights.dailyTotals.length} days.`)
+      parts.push(`Top activity: ${topCatName} (${topCatHours}h).`)
+      parts.push(`Timeline completeness: ${completeness}%.`)
+      if (completeness < 70) parts.push('Resolve a few more gaps to improve your insights.')
+      else if (completeness >= 85) parts.push('Excellent coverage — your insights are highly representative.')
+
+      const n = await createNotification({
+        userId,
+        type: 'insight',
+        title: `📊 Your week in review`,
+        body: parts.join(' '),
+        actionType: 'view_insight',
+        actionPayload: { weekly: true, key: weekSummaryKey },
+      })
+      created.push(n)
+    } catch {
+      // Silent failure — non-critical
     }
   }
 

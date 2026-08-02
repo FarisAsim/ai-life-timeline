@@ -9,6 +9,7 @@ import { EventFormDialog } from './event-form-dialog'
 import { QuickAddButton } from './quick-add-button'
 import { TodayDashboard } from './today-dashboard'
 import { HourBar } from './hour-bar'
+import { TagFilterBar } from './tag-filter-bar'
 import { ResolutionDialog } from '@/components/unknown-blocks/resolution-dialog'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -33,6 +34,7 @@ export function TimelineView() {
   // Listen for the 'timeline:new-event' CustomEvent (dispatched by the 'n' keyboard shortcut)
   const [creating, setCreating] = useState(false)
   const [resolving, setResolving] = useState<UnknownBlock | null>(null)
+  const [selectedTag, setSelectedTag] = useState<string | null>(null)
   useEffect(() => {
     const handler = () => setCreating(true)
     window.addEventListener('timeline:new-event', handler)
@@ -47,17 +49,22 @@ export function TimelineView() {
       const s = new Date(e.startTime)
       return s.toDateString() === dayStart.toDateString()
     })
+    // Apply tag filter if selected
+    const filteredEvents = selectedTag ? dayEvents.filter((e) => e.tags.includes(selectedTag)) : dayEvents
     const dayBlocks = (blocks ?? []).filter((b) => {
       const s = new Date(b.startTime)
       return s.toDateString() === dayStart.toDateString() && (b.status === 'open' || b.status === 'ai_guessed_pending_confirmation')
     })
-    const all: Row[] = [
-      ...dayEvents.map((e) => ({ kind: 'event' as const, data: e })),
-      ...dayBlocks.map((b) => ({ kind: 'gap' as const, data: b })),
-    ]
+    // When filtering by tag, hide gaps (they don't have tags)
+    const all: Row[] = selectedTag
+      ? filteredEvents.map((e) => ({ kind: 'event' as const, data: e }))
+      : [
+          ...filteredEvents.map((e) => ({ kind: 'event' as const, data: e })),
+          ...dayBlocks.map((b) => ({ kind: 'gap' as const, data: b })),
+        ]
     all.sort((a, b) => new Date(a.data.startTime).getTime() - new Date(b.data.startTime).getTime())
     return all
-  }, [events, blocks, selectedDate])
+  }, [events, blocks, selectedDate, selectedTag])
 
   const totalTracked = useMemo(
     () => (events ?? []).reduce((s, e) => s + e.durationMinutes, 0),
@@ -96,6 +103,9 @@ export function TimelineView() {
 
       {/* Hour-by-hour visual bar */}
       <HourBar />
+
+      {/* Tag filter bar */}
+      <TagFilterBar events={events ?? []} selectedTag={selectedTag} onTagSelect={setSelectedTag} />
 
       {/* Timeline rows */}
       {loading ? (
