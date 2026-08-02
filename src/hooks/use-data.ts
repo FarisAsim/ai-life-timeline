@@ -536,7 +536,7 @@ export function useCreateGoal() {
   const qc = useQueryClient()
   const triggerRefresh = useAppStore((s) => s.triggerRefresh)
   return useMutation({
-    mutationFn: async (vars: { title: string; type: string; categoryId?: string | null; targetValue: number; period: string }) => {
+    mutationFn: async (vars: { title: string; type: string; categoryId?: string | null; tag?: string | null; targetValue: number; period: string }) => {
       const r = await fetch('/api/goals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

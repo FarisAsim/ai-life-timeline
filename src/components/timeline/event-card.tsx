@@ -7,13 +7,13 @@ import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
 import { EventFormDialog, formatTimeRange } from './event-form-dialog'
-import { useDeleteEvent, useUploadAttachment, useDeleteAttachment, attachmentUrl, useCreateTemplate } from '@/hooks/use-data'
+import { useDeleteEvent, useUploadAttachment, useDeleteAttachment, attachmentUrl, useCreateTemplate, useCreateEvent } from '@/hooks/use-data'
 import { useDragDrop } from '@/hooks/use-drag-drop'
 import type { TimelineEvent } from '@/lib/types'
 import { CATEGORY_COLOR_MAP, SOURCE_LABELS } from '@/lib/types'
 import { format } from 'date-fns'
 import {
-  MoreVertical, Pencil, Trash2, MapPin, Clock, AlignLeft, StickyNote, ChevronDown, Sparkles, Bot, Paperclip, Image as ImageIcon, FileText, X, Loader2, Mic, Star,
+  MoreVertical, Pencil, Trash2, MapPin, Clock, AlignLeft, StickyNote, ChevronDown, Sparkles, Bot, Paperclip, Image as ImageIcon, FileText, X, Loader2, Mic, Star, Copy,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -27,6 +27,7 @@ export function EventCard({ event }: { event: TimelineEvent }) {
   const uploadMut = useUploadAttachment()
   const deleteAttMut = useDeleteAttachment()
   const createTemplateMut = useCreateTemplate()
+  const createEventMut = useCreateEvent()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { isDragging, dragHandlers, dropzoneClassName } = useDragDrop({ eventId: event.id, onUploaded: () => setExpanded(true) })
 
@@ -56,6 +57,31 @@ export function EventCard({ event }: { event: TimelineEvent }) {
       {
         onSuccess: () => toast.success(`"${event.title}" saved as template`),
         onError: () => toast.error('Failed to save template'),
+      },
+    )
+  }
+
+  const handleDuplicate = () => {
+    // Create a copy starting now (or +1h from the original end if today)
+    const now = new Date()
+    const newStart = now
+    const newEnd = new Date(now.getTime() + event.durationMinutes * 60 * 1000)
+    createEventMut.mutate(
+      {
+        title: event.title,
+        description: event.description ?? undefined,
+        startTime: newStart.toISOString(),
+        endTime: newEnd.toISOString(),
+        location: event.location ?? undefined,
+        notes: event.notes ?? undefined,
+        tags: event.tags,
+        categoryId: event.categoryId,
+        source: 'user_manual',
+        confidenceScore: 1.0,
+      },
+      {
+        onSuccess: () => toast.success(`"${event.title}" duplicated to now`),
+        onError: () => toast.error('Failed to duplicate event'),
       },
     )
   }
@@ -181,6 +207,9 @@ export function EventCard({ event }: { event: TimelineEvent }) {
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={handleSaveAsTemplate}>
                         <Star className="mr-2 h-3.5 w-3.5" /> Save as template
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleDuplicate}>
+                        <Copy className="mr-2 h-3.5 w-3.5" /> Duplicate to now
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem className="text-rose-600 focus:text-rose-600" onClick={handleDelete}>

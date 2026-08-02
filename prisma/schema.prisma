@@ -192,8 +192,9 @@ model Goal {
   id          String   @id @default(cuid())
   userId      String
   title       String
-  type        String   // category_hours | event_count | completion_pct
+  type        String   // category_hours | event_count | completion_pct | tag_hours
   categoryId  String?
+  tag         String?  // for tag_hours goals
   targetValue Float    // e.g. 10 hours, 5 events, 85%
   period      String   // weekly | monthly
   createdAt   DateTime @default(now())

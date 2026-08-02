@@ -23,8 +23,9 @@ export function GoalsWidget() {
 
   // Form state
   const [title, setTitle] = useState('')
-  const [type, setType] = useState<'category_hours' | 'event_count' | 'completion_pct'>('category_hours')
+  const [type, setType] = useState<'category_hours' | 'event_count' | 'completion_pct' | 'tag_hours'>('category_hours')
   const [categoryId, setCategoryId] = useState<string>('none')
+  const [tag, setTag] = useState('')
   const [targetValue, setTargetValue] = useState('10')
   const [period, setPeriod] = useState<'weekly' | 'monthly'>('weekly')
 
@@ -38,6 +39,7 @@ export function GoalsWidget() {
         title: title.trim(),
         type,
         categoryId: type === 'category_hours' ? (categoryId === 'none' ? null : categoryId) : null,
+        tag: type === 'tag_hours' ? tag.trim() || null : null,
         targetValue: Number(targetValue) || 1,
         period,
       },
@@ -45,6 +47,7 @@ export function GoalsWidget() {
         onSuccess: () => {
           toast.success('Goal created')
           setTitle('')
+          setTag('')
           setOpen(false)
         },
         onError: () => toast.error('Failed to create goal'),
@@ -56,6 +59,7 @@ export function GoalsWidget() {
     category_hours: 'hours of',
     event_count: 'events',
     completion_pct: '% completion',
+    tag_hours: 'hours on tag',
   }
 
   if (isLoading) {
@@ -94,6 +98,7 @@ export function GoalsWidget() {
                       <SelectItem value="category_hours">Category hours</SelectItem>
                       <SelectItem value="event_count">Event count</SelectItem>
                       <SelectItem value="completion_pct">Completion %</SelectItem>
+                      <SelectItem value="tag_hours">Tag hours</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -120,6 +125,18 @@ export function GoalsWidget() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+              )}
+              {type === 'tag_hours' && (
+                <div className="grid gap-1">
+                  <Label htmlFor="goal-tag" className="text-[11px]">Tag (without #)</Label>
+                  <Input
+                    id="goal-tag"
+                    value={tag}
+                    onChange={(e) => setTag(e.target.value)}
+                    placeholder="e.g. project-x, health"
+                    className="h-8 text-sm"
+                  />
                 </div>
               )}
               {type !== 'completion_pct' && (
@@ -172,6 +189,7 @@ export function GoalsWidget() {
                     </div>
                     <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted-foreground">
                       {goal.category && <CategoryDot color={goal.category.color} />}
+                      {goal.tag && <span className="text-teal-600">#{goal.tag}</span>}
                       <span>{goal.period}</span>
                       <span>·</span>
                       <span>{goal.currentValue.toFixed(1)} / {goal.targetValue} {typeLabels[goal.type]}</span>

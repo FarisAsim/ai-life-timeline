@@ -870,3 +870,71 @@ Task: QA pass + new features (tag breakdown, streak widget, CSV export) + stylin
 5. **Dev server stability** — sandbox kills background processes after ~60s; not a production issue.
 6. **PDF export** — CSV and JSON are available; PDF would be nice for printable summaries. Next: add a PDF report generator.
 7. **Tag-based goal tracking** — goals support category_hours and event_count but not tag-based goals (e.g. "10 hours on #project-x"). Next: add tag-based goal type.
+
+---
+
+## Task ID: 11
+Agent: main (Z.ai Code) — webDevReview cron round 10
+Task: QA pass + new features (tag-based goals, event duplicate) + styling polish.
+
+### Work Log
+
+#### QA pass
+- All 23 API endpoints return 200, lint passes clean, no browser errors.
+- App is stable — no new bugs found.
+
+#### New feature: Tag-based goal tracking (unresolved issue #7)
+- Added `tag` field to the `Goal` Prisma model.
+- Updated `goal-service.ts`:
+  - `GoalData` interface includes `tag: string | null`.
+  - `serialize()` includes the tag field.
+  - `listGoals()` computes `tag_hours` goal type: queries events whose `tags` field contains the tag, then filters for exact match (case-insensitive).
+  - `createGoal()` accepts and stores the `tag` parameter.
+- Updated `POST /api/goals` route to pass `tag` through.
+- Updated `useCreateGoal` hook to accept `tag`.
+- Updated `GoalsWidget`:
+  - Added `tag_hours` to the goal type select dropdown.
+  - Added "Tag (without #)" input field that appears when `tag_hours` is selected.
+  - Updated `typeLabels` to include "hours on tag".
+  - Goal display shows `#tag` in teal next to the category dot.
+  - Tag input is cleared after goal creation.
+- Verified: created "Project X time" goal with tag "project-x", target 5h → goal stored with correct tag and progress computed.
+
+#### New feature: Event duplicate/clone
+- Added "Duplicate to now" option to the event card dropdown menu (Copy icon).
+- `handleDuplicate()` creates a new event with the same title, description, location, notes, tags, and category, but starting at the current time and ending at now + original duration.
+- Uses the existing `useCreateEvent` hook.
+- Toast confirmation on success.
+- Perfect for recurring activities (e.g. "I just started another gym session").
+- Verified: the menu item appears in the event dropdown.
+
+#### Styling polish
+- **Goals widget**: tag input field with placeholder, #tag display in teal.
+- **Event card**: new "Duplicate to now" menu item with Copy icon.
+- **Goal type dropdown**: 4 options now (Category hours, Event count, Completion %, Tag hours).
+
+#### Verification results
+- `bun run lint` → 0 errors, 0 warnings ✅
+- All 11 API endpoints return 200 ✅
+- Tag-based goal created and progress computed ✅
+- Event duplicate menu item renders ✅
+- Insights view renders with all widgets ✅
+- No browser errors ✅
+
+### Stage Summary
+- **2 new features added**: Tag-based goal tracking, Event duplicate/clone.
+- **1 unresolved issue closed**: #7 (tag-based goal tracking).
+- Total API routes: 23 (unchanged — tag goals use existing goal routes).
+- Total Prisma models: 11 (unchanged — tag added as field on Goal).
+- Total components: enhanced GoalsWidget (tag input + display), EventCard (duplicate menu item).
+- All features verified working via curl and agent-browser.
+- Lint passes clean.
+
+### Unresolved Issues / Next-phase Priorities
+1. **Auth is still stubbed** (single demo user). Next phase: wire NextAuth.js.
+2. **Gap detection runs on-demand** — next: add a scheduled/cron background pass.
+3. **Analytics snapshots** not yet implemented — fine at MVP scale.
+4. **Semantic search** uses LLM ranking — at scale, switch to embedding-based vector search.
+5. **Dev server stability** — sandbox kills background processes after ~60s; not a production issue.
+6. **PDF export** — CSV and JSON are available; PDF would be nice for printable summaries. Next: add a PDF report generator.
+7. **Recurring event scheduling** — duplicate creates a one-time copy. Next: add proper recurring event support (daily/weekly/monthly).

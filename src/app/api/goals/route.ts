@@ -11,10 +11,10 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const user = await getDemoUser()
   const body = await req.json()
-  const { title, type, categoryId, targetValue, period } = body
+  const { title, type, categoryId, tag, targetValue, period } = body
   if (!title || !type || !targetValue || !period) {
     return NextResponse.json({ error: 'title, type, targetValue, period required' }, { status: 400 })
   }
-  const goal = await createGoal(user.id, { title, type, categoryId: categoryId ?? null, targetValue: Number(targetValue), period })
+  const goal = await createGoal(user.id, { title, type, categoryId: categoryId ?? null, tag: tag ?? null, targetValue: Number(targetValue), period })
   return NextResponse.json({ goal })
 }

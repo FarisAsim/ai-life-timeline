@@ -5,8 +5,9 @@ import { subDays } from 'date-fns'
 export interface GoalData {
   id: string
   title: string
-  type: string // category_hours | event_count | completion_pct
+  type: string // category_hours | event_count | completion_pct | tag_hours
   categoryId: string | null
+  tag: string | null
   category: Category | null
   targetValue: number
   period: string // weekly | monthly
@@ -21,6 +22,7 @@ function serialize(g: Awaited<ReturnType<typeof db.goal.findFirst>> & object, ca
     title: g.title,
     type: g.type,
     categoryId: g.categoryId,
+    tag: 'tag' in g ? (g as { tag?: string }).tag ?? null : null,
     category: cat,
     targetValue: g.targetValue,
     period: g.period,
@@ -66,6 +68,23 @@ export async function listGoals(userId: string): Promise<GoalData[]> {
       const days = g.period === 'weekly' ? 7 : 30
       const possibleMin = days * 17 * 60 // 17 waking hours per day
       currentValue = possibleMin > 0 ? Math.round((totalMin / possibleMin) * 100) : 0
+    } else if (g.type === 'tag_hours' && g.tag) {
+      // Tag-based hours: find events whose tags field contains the tag
+      const events = await db.timelineEvent.findMany({
+        where: {
+          userId,
+          startTime: { gte: startDate, lte: now },
+          tags: { contains: g.tag },
+        },
+        select: { durationMinutes: true, tags: true },
+      })
+      // Filter to ensure exact tag match (not substring)
+      const filtered = events.filter((e) => {
+        if (!e.tags) return false
+        const tags = e.tags.split(',').map((t) => t.trim().toLowerCase())
+        return tags.includes(g.tag!.toLowerCase())
+      })
+      currentValue = filtered.reduce((s, e) => s + e.durationMinutes, 0) / 60
     }
 
     result.push(serialize(g, g.categoryId ? catMap.get(g.categoryId) ?? null : null, currentValue))
@@ -73,13 +92,14 @@ export async function listGoals(userId: string): Promise<GoalData[]> {
   return result
 }
 
-export async function createGoal(userId: string, input: { title: string; type: string; categoryId?: string | null; targetValue: number; period: string }): Promise<GoalData> {
+export async function createGoal(userId: string, input: { title: string; type: string; categoryId?: string | null; tag?: string | null; targetValue: number; period: string }): Promise<GoalData> {
   const g = await db.goal.create({
     data: {
       userId,
       title: input.title,
       type: input.type,
       categoryId: input.categoryId ?? null,
+      tag: input.tag ?? null,
       targetValue: input.targetValue,
       period: input.period,
     },
