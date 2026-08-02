@@ -10,12 +10,13 @@ import { QuickAddButton } from './quick-add-button'
 import { TodayDashboard } from './today-dashboard'
 import { HourBar } from './hour-bar'
 import { TagFilterBar } from './tag-filter-bar'
+import { VoiceCaptureDialog } from './voice-capture-dialog'
 import { ResolutionDialog } from '@/components/unknown-blocks/resolution-dialog'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Card } from '@/components/ui/card'
 import { format, differenceInMinutes, isToday } from 'date-fns'
-import { Plus, Clock, Sparkles, Hourglass, AlertCircle, ScanLine } from 'lucide-react'
+import { Plus, Clock, Sparkles, Hourglass, AlertCircle, ScanLine, Mic } from 'lucide-react'
 import type { TimelineEvent, UnknownBlock } from '@/lib/types'
 import { CATEGORY_COLOR_MAP } from '@/lib/types'
 import { toast } from 'sonner'
@@ -35,6 +36,7 @@ export function TimelineView() {
   const [creating, setCreating] = useState(false)
   const [resolving, setResolving] = useState<UnknownBlock | null>(null)
   const [selectedTag, setSelectedTag] = useState<string | null>(null)
+  const [voiceCapture, setVoiceCapture] = useState(false)
   useEffect(() => {
     const handler = () => setCreating(true)
     window.addEventListener('timeline:new-event', handler)

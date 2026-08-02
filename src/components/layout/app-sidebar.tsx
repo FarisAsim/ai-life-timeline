@@ -6,11 +6,12 @@ import { useNotifications } from '@/hooks/use-data'
 import { useTheme } from 'next-themes'
 import {
   CalendarDays, Clock, Compass, LayoutList, Bell, Search, Sparkles,
-  Hourglass, CircleHelp, Menu, X, Settings, Sun, Moon,
+  Hourglass, CircleHelp, Menu, X, Settings, Sun, Moon, Languages,
 } from 'lucide-react'
 import type { ViewName } from '@/lib/types'
 import { useEffect, useState } from 'react'
 import { StreakBadge } from './streak-badge'
+import { useLocaleStore } from '@/stores/locale-store'
 
 const NAV_ITEMS: { id: ViewName; label: string; icon: typeof Clock; description: string }[] = [
   { id: 'timeline', label: 'Timeline', icon: LayoutList, description: 'Hour-by-hour record of your day' },
@@ -123,6 +124,7 @@ export function AppSidebar() {
         <div className="border-t p-4">
           <div className="mb-2 flex items-center gap-2">
             <ThemeToggle />
+            <LocaleToggle />
             <button
               onClick={() => setView('settings')}
               className={cn(
@@ -183,6 +185,21 @@ export function MobileMenuButton() {
       aria-label="Toggle menu"
     >
       <Menu className="h-5 w-5" />
+    </button>
+  )
+}
+
+function LocaleToggle() {
+  const locale = useLocaleStore((s) => s.locale)
+  const toggle = useLocaleStore((s) => s.toggle)
+  return (
+    <button
+      onClick={toggle}
+      className="flex h-9 w-9 items-center justify-center rounded-lg border text-muted-foreground transition-colors hover:bg-accent"
+      aria-label="Toggle language"
+      title={locale === 'en' ? 'التبديل إلى العربية' : 'Switch to English'}
+    >
+      <Languages className="h-4 w-4" />
     </button>
   )
 }

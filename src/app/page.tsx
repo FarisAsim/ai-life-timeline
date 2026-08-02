@@ -1,6 +1,5 @@
 'use client'
 
-import { useEffect } from 'react'
 import { useAppStore } from '@/stores/app-store'
 import { AppSidebar } from '@/components/layout/app-sidebar'
 import { AppHeader } from '@/components/layout/app-header'
@@ -13,29 +12,18 @@ import { InsightsView } from '@/components/insights/insights-view'
 import { SearchView } from '@/components/search/search-view'
 import { SettingsView } from '@/components/settings/settings-view'
 import { WelcomeDialog } from '@/components/onboarding/welcome-dialog'
-import { useSeed, useSettings } from '@/hooks/use-data'
+import { useSettings } from '@/hooks/use-data'
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts'
-import { toast } from 'sonner'
 import { Sparkles } from 'lucide-react'
 
 export default function Home() {
   const view = useAppStore((s) => s.view)
-  const seed = useSeed()
   const { data: settings } = useSettings()
 
   useKeyboardShortcuts()
 
-  // Auto-seed demo data on first load so the app is immediately useful
-  useEffect(() => {
-    seed.mutate(undefined, {
-      onSuccess: (d: { seeded?: boolean } | undefined) => {
-        if (d?.seeded) toast.success('Welcome — demo data is loaded. Explore your timeline!')
-      },
-      onError: () => {
-        /* ignore — may already be seeded */
-      },
-    })
-  }, []) // run once on mount
+  // No auto-seed — the app starts empty for real use.
+  // Users can seed demo data via the "Seed demo data" button in the header or Settings.
 
   return (
     <div className="flex min-h-screen flex-col bg-background">

@@ -1,0 +1,21 @@
+{
+  "name": "AI Life Timeline",
+  "short_name": "LifeTimeline",
+  "description": "Never lose a moment. An AI-assisted, hour-by-hour record of your life.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#10b981",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "lifestyle"],
+  "lang": "en",
+  "dir": "auto"
+}
