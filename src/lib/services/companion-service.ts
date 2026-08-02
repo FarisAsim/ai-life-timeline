@@ -1,8 +1,8 @@
 import ZAI from 'z-ai-web-dev-sdk'
 import { db } from '@/lib/db'
 import { format } from 'date-fns'
-import { listEventsForRange } from './timeline-service'
-import { listOpenBlocks } from './gap-detection-service'
+import { listEventsForRange, createEvent, updateEvent } from './timeline-service'
+import { listOpenBlocks, resolveBlockWithText } from './gap-detection-service'
 
 let zaiInstance: Awaited<ReturnType<typeof ZAI.create>> | null = null
 async function getZAI() {
@@ -15,21 +15,36 @@ const SYSTEM_PROMPT = `You are the AI Companion for "AI Life Timeline" — an ap
 Your role:
 - Answer questions grounded ONLY in the timeline data provided to you in the user context. Never fabricate events.
 - If the user asks about a time period with no recorded data, say so honestly and reference any Unknown Blocks that exist for that period.
-- You can take actions by responding with a JSON action block. When you take an action, ALWAYS output it as a fenced JSON block tagged \`action\` so the client can parse it.
+- You can take actions by responding with a JSON action block. When you take an action, ALWAYS output it as a fenced JSON block tagged \`action\` so the client can parse and EXECUTE it.
 - Be warm but concise. Use a friendly, conversational tone.
 
+When the user asks you to create, move, or resolve something, USE an action block — do not just describe what you would do. The system will execute it immediately.
+
 Action format (output as a fenced code block with language "action"):
+
+Create an event:
 \`\`\`action
-{ "type": "create_event", "title": "...", "startTime": "ISO", "endTime": "ISO", "categoryId": "...|null", "description": "..." }
-\`\`\`
-or
-\`\`\`action
-{ "type": "answer", "text": "your visible reply if you also took an action" }
+{ "type": "create_event", "title": "short label", "startTime": "ISO 8601 with timezone", "endTime": "ISO 8601 with timezone", "categoryName": "Work|Study|Exercise|Sleep|Prayer|Social|Screen Time|Meals|Commute|Personal", "description": "optional" }
 \`\`\`
 
-If you are only answering (no action), reply in plain text without a code block.
+Resolve a gap (requires a blockId from the context):
+\`\`\`action
+{ "type": "resolve_gap", "blockId": "block id from context", "title": "what they did", "categoryName": "category name or omit", "description": "optional" }
+\`\`\`
 
-The user's timezone is the one in their context. All times you reference must be human-readable.`
+Move/update an event:
+\`\`\`action
+{ "type": "move_event", "eventId": "event id", "startTime": "new ISO", "endTime": "new ISO" }
+\`\`\`
+
+Create a reminder:
+\`\`\`action
+{ "type": "create_reminder", "text": "reminder text" }
+\`\`\`
+
+IMPORTANT: Always include a short visible reply BEFORE the action block explaining what you're doing. Times must be ISO 8601 strings (e.g. "2026-08-02T14:00:00.000Z"). Infer reasonable durations if the user doesn't specify (e.g. gym = 1h, meeting = 30m, meal = 45m).
+
+If you are only answering a question (no action), reply in plain text without a code block.`
 
 export interface CompanionContext {
   userId: string
@@ -57,12 +72,12 @@ export async function buildUserContext(userId: string, userTimezone: string): Pr
   const eventLines = events.slice(0, 40).map((e) => {
     const start = format(new Date(e.startTime), 'EEE MMM d, h:mm a')
     const end = format(new Date(e.endTime), 'h:mm a')
-    return `- ${start} – ${end}: "${e.title}" [category: ${e.category?.name ?? 'none'}] [source: ${e.source}]`
+    return `- id=${e.id} | ${start} – ${end}: "${e.title}" [category: ${e.category?.name ?? 'none'}] [source: ${e.source}]`
   })
   const blockLines = blocks.slice(0, 10).map((b) => {
     const start = format(new Date(b.startTime), 'EEE MMM d, h:mm a')
     const end = format(new Date(b.endTime), 'h:mm a')
-    return `- ${start} – ${end} (gap of ${Math.round(b.durationMinutes / 60)}h${Math.round(b.durationMinutes % 60)}m, severity: ${b.severity})`
+    return `- id=${b.id} | ${start} – ${end} (gap of ${Math.round(b.durationMinutes / 60)}h${Math.round(b.durationMinutes % 60)}m, severity: ${b.severity})`
   })
 
   return `USER CONTEXT (timezone: ${userTimezone}, current time: ${format(now, "EEE MMM d, yyyy h:mm a z")}):
@@ -77,6 +92,7 @@ export interface CompanionResponse {
   reply: string
   action: { type: string; data?: unknown } | null
   raw: string
+  actionResult: { executed: boolean; detail: string; eventId?: string } | null
 }
 
 export async function chat(userId: string, conversationId: string | null, userMessage: string, userTimezone: string): Promise<CompanionResponse> {
@@ -134,7 +150,98 @@ export async function chat(userId: string, conversationId: string | null, userMe
     }
   }
 
-  return { reply, action, raw }
+  // Execute the action through the validated service layer
+  let actionResult: { executed: boolean; detail: string; eventId?: string } | null = null
+  if (action) {
+    actionResult = await executeAction(userId, action)
+  }
+
+  return { reply, action, raw, actionResult }
+}
+
+// Executes a companion action through the same validated service calls a UI action would use.
+async function executeAction(
+  userId: string,
+  action: { type: string; data?: unknown },
+): Promise<{ executed: boolean; detail: string; eventId?: string }> {
+  const d = (action.data ?? {}) as {
+    title?: string
+    startTime?: string
+    endTime?: string
+    categoryId?: string | null
+    categoryName?: string
+    description?: string
+    eventId?: string
+    blockId?: string
+    text?: string
+  }
+  try {
+    switch (action.type) {
+      case 'create_event': {
+        if (!d.title || !d.startTime || !d.endTime) {
+          return { executed: false, detail: 'Missing title, startTime, or endTime' }
+        }
+        // Resolve category by name if provided
+        let categoryId = d.categoryId ?? null
+        if (!categoryId && d.categoryName) {
+          const cat = await db.category.findFirst({
+            where: { userId, name: { equals: d.categoryName } },
+          })
+          categoryId = cat?.id ?? null
+        }
+        const event = await createEvent(userId, {
+          title: d.title,
+          startTime: d.startTime,
+          endTime: d.endTime,
+          categoryId,
+          description: d.description,
+          source: 'ai_confirmed',
+          confidenceScore: 0.8,
+        })
+        return { executed: true, detail: `Created event "${event.title}"`, eventId: event.id }
+      }
+      case 'move_event': {
+        if (!d.eventId) return { executed: false, detail: 'Missing eventId' }
+        const update: Parameters<typeof updateEvent>[2] = {}
+        if (d.startTime) update.startTime = d.startTime
+        if (d.endTime) update.endTime = d.endTime
+        if (d.title) update.title = d.title
+        const event = await updateEvent(userId, d.eventId, update)
+        if (!event) return { executed: false, detail: 'Event not found' }
+        return { executed: true, detail: `Updated event "${event.title}"`, eventId: event.id }
+      }
+      case 'resolve_gap': {
+        if (!d.blockId || !d.title) return { executed: false, detail: 'Missing blockId or title' }
+        let categoryId = d.categoryId ?? null
+        if (!categoryId && d.categoryName) {
+          const cat = await db.category.findFirst({
+            where: { userId, name: { equals: d.categoryName } },
+          })
+          categoryId = cat?.id ?? null
+        }
+        const result = await resolveBlockWithText(userId, d.blockId, d.title, categoryId, d.description)
+        if (!result) return { executed: false, detail: 'Block not found' }
+        return { executed: true, detail: `Resolved gap with "${d.title}"`, eventId: result.event.id }
+      }
+      case 'create_reminder': {
+        // Reminders are stored as notifications
+        await db.notification.create({
+          data: {
+            userId,
+            type: 'insight',
+            title: 'Reminder',
+            body: d.text ?? d.title ?? 'Reminder',
+            actionType: 'view_event',
+          },
+        })
+        return { executed: true, detail: 'Created a reminder' }
+      }
+      default:
+        return { executed: false, detail: `Unknown action type: ${action.type}` }
+    }
+  } catch (e) {
+    return { executed: false, detail: e instanceof Error ? e.message : 'Action failed' }
+  }
 }
 
 export async function listConversations(userId: string) {
@@ -185,7 +292,7 @@ Respond with ONLY a JSON object (no markdown, no prose):
     const parsed = JSON.parse(cleaned)
     let categoryId: string | null = null
     if (parsed.categoryName) {
-      const cat = await db.category.findFirst({ where: { userId, name: { equals: parsed.categoryName, mode: 'insensitive' } } })
+      const cat = await db.category.findFirst({ where: { userId, name: { equals: parsed.categoryName } } })
       if (cat) categoryId = cat.id
     }
     return {

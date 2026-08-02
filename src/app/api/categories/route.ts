@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   const { name, color, icon } = body
   if (!name || !color) return NextResponse.json({ error: 'name and color required' }, { status: 400 })
   // upsert by name
-  const existing = await import('@/lib/db').then(m => m.db.category.findFirst({ where: { userId: user.id, name: { equals: name, mode: 'insensitive' } } }))
+  const existing = await import('@/lib/db').then(m => m.db.category.findFirst({ where: { userId: user.id, name: { equals: name } } }))
   if (existing) {
     const updated = await import('@/lib/db').then(m => m.db.category.update({ where: { id: existing.id }, data: { color, icon: icon ?? existing.icon } }))
     return NextResponse.json({ category: updated })

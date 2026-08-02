@@ -11,6 +11,7 @@ import { UnknownBlocksView } from '@/components/unknown-blocks/unknown-blocks-vi
 import { CompanionView } from '@/components/companion/companion-view'
 import { InsightsView } from '@/components/insights/insights-view'
 import { SearchView } from '@/components/search/search-view'
+import { SettingsView } from '@/components/settings/settings-view'
 import { useSeed } from '@/hooks/use-data'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -45,6 +46,7 @@ export default function Home() {
             {view === 'companion' && <CompanionView />}
             {view === 'insights' && <InsightsView />}
             {view === 'search' && <SearchView />}
+            {view === 'settings' && <SettingsView />}
           </main>
         </div>
       </div>

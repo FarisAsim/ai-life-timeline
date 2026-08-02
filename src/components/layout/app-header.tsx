@@ -17,6 +17,7 @@ const VIEW_META: Record<string, { title: string; subtitle: string }> = {
   insights: { title: 'Insights', subtitle: 'Patterns and analytics' },
   search: { title: 'Search', subtitle: 'Semantic search across events' },
   notifications: { title: 'Notifications', subtitle: 'Conversational reminders' },
+  settings: { title: 'Settings', subtitle: 'Profile, privacy, and data controls' },
 }
 
 export function AppHeader() {

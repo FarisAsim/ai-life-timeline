@@ -16,6 +16,6 @@ export async function getCategoryMap(userId: string): Promise<Map<string, Catego
 
 export async function findCategoryByName(userId: string, name: string) {
   return db.category.findFirst({
-    where: { userId, name: { equals: name, mode: 'insensitive' } },
+    where: { userId, name: { equals: name } },
   })
 }

@@ -3,9 +3,10 @@
 import { useAppStore } from '@/stores/app-store'
 import { cn } from '@/lib/utils'
 import { useNotifications } from '@/hooks/use-data'
+import { useTheme } from 'next-themes'
 import {
   CalendarDays, Clock, Compass, LayoutList, Bell, Search, Sparkles,
-  Hourglass, CircleHelp, Menu, X,
+  Hourglass, CircleHelp, Menu, X, Settings, Sun, Moon,
 } from 'lucide-react'
 import type { ViewName } from '@/lib/types'
 import { useEffect, useState } from 'react'
@@ -119,6 +120,19 @@ export function AppSidebar() {
 
         {/* Footer status */}
         <div className="border-t p-4">
+          <div className="mb-2 flex items-center gap-2">
+            <ThemeToggle />
+            <button
+              onClick={() => setView('settings')}
+              className={cn(
+                'flex flex-1 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-colors hover:bg-accent',
+                view === 'settings' && 'border-emerald-500/40 bg-emerald-500/5',
+              )}
+            >
+              <Settings className="h-3.5 w-3.5" />
+              Settings
+            </button>
+          </div>
           <div className="rounded-lg bg-muted/50 p-3">
             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
               <Sparkles className="h-3.5 w-3.5 text-emerald-500" />
@@ -137,6 +151,22 @@ export function AppSidebar() {
 function UnknownBadge() {
   return null
   // The badge is shown via the view header instead; keep this as a placeholder hook for future counts.
+}
+
+function ThemeToggle() {
+  const { theme, setTheme } = useTheme()
+  const isDark = theme === 'dark'
+  return (
+    <button
+      onClick={() => setTheme(isDark ? 'light' : 'dark')}
+      className="flex h-9 w-9 items-center justify-center rounded-lg border text-muted-foreground transition-colors hover:bg-accent"
+      aria-label="Toggle theme"
+      title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      suppressHydrationWarning
+    >
+      {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+    </button>
+  )
 }
 
 export function MobileMenuButton() {

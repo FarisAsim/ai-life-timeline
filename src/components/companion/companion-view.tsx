@@ -22,10 +22,10 @@ interface ChatMessage {
 }
 
 const SUGGESTIONS = [
+  'Add a gym session for tomorrow at 6am',
   'What did I do yesterday afternoon?',
-  'How complete is my timeline this week?',
-  'What gaps do I still need to fill?',
-  'Summarize my last 3 days',
+  'Resolve my biggest gap from the AI guess',
+  'Remind me to review my timeline tonight',
 ]
 
 export function CompanionView() {
@@ -88,8 +88,19 @@ export function CompanionView() {
       reply = reply.replace(/```action[\s\S]*?```/g, '').trim()
       const aiMsg: ChatMessage = { role: 'assistant', content: reply, createdAt: new Date().toISOString() }
       setMessages((m) => [...m, aiMsg])
-      // If action was taken, append a system note
-      if (result.action && result.action.type !== 'answer') {
+      // If an action was executed, show the result as a confirmation card
+      if (result.actionResult) {
+        const actionNote: ChatMessage = {
+          role: 'assistant',
+          content: `_${result.actionResult.executed ? '✓ ' + result.actionResult.detail : '⚠ ' + result.actionResult.detail}_`,
+          createdAt: new Date().toISOString(),
+        }
+        setMessages((m) => [...m, actionNote])
+        if (result.actionResult.executed) {
+          toast.success(result.actionResult.detail)
+        }
+      } else if (result.action && result.action.type !== 'answer') {
+        // Fallback for actions that didn't execute
         const actionNote: ChatMessage = {
           role: 'assistant',
           content: `_${formatActionNote(result.action)}_`,

@@ -18,6 +18,7 @@ export type ViewName =
   | 'insights'
   | 'search'
   | 'notifications'
+  | 'settings'
 
 export interface Category {
   id: string

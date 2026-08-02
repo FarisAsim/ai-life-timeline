@@ -326,3 +326,51 @@ export function useSeed() {
     },
   })
 }
+
+// ---------- Settings ----------
+export function useSettings() {
+  const refreshTick = useAppStore((s) => s.refreshTick)
+  return useQuery({
+    queryKey: ['settings', refreshTick],
+    queryFn: async () => {
+      const r = await fetch('/api/settings')
+      return r.json()
+    },
+  })
+}
+
+export function useUpdateSettings() {
+  const qc = useQueryClient()
+  const triggerRefresh = useAppStore((s) => s.triggerRefresh)
+  return useMutation({
+    mutationFn: async (vars: { name?: string; timezone?: string; quietHoursStart?: string; quietHoursEnd?: string }) => {
+      const r = await fetch('/api/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(vars),
+      })
+      if (!r.ok) throw new Error('Failed to update settings')
+      return r.json()
+    },
+    onSuccess: () => {
+      triggerRefresh()
+      qc.invalidateQueries({ queryKey: ['settings'] })
+    },
+  })
+}
+
+export function useDeleteAccount() {
+  const qc = useQueryClient()
+  const triggerRefresh = useAppStore((s) => s.triggerRefresh)
+  return useMutation({
+    mutationFn: async () => {
+      const r = await fetch('/api/account', { method: 'DELETE' })
+      if (!r.ok) throw new Error('Failed to delete account')
+      return r.json()
+    },
+    onSuccess: () => {
+      triggerRefresh()
+      qc.invalidateQueries()
+    },
+  })
+}

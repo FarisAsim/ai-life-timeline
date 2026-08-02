@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useAppStore } from '@/stores/app-store'
 import { useTimelineDay, useUnknownBlocks, useDetectGaps } from '@/hooks/use-data'
 import { EventCard } from './event-card'
@@ -12,7 +13,9 @@ import { Card } from '@/components/ui/card'
 import { format, differenceInMinutes, isToday } from 'date-fns'
 import { Plus, Clock, Sparkles, Hourglass, AlertCircle, ScanLine } from 'lucide-react'
 import type { TimelineEvent, UnknownBlock } from '@/lib/types'
+import { CATEGORY_COLOR_MAP } from '@/lib/types'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 
 type Row =
   | { kind: 'event'; data: TimelineEvent }
@@ -65,6 +68,7 @@ export function TimelineView() {
         trackedMinutes={totalTracked}
         gapCount={rows.filter((r) => r.kind === 'gap').length}
         today={today}
+        events={events ?? []}
         onScan={() => {
           detectGaps.mutate(selectedDate, {
             onSuccess: (d: { count?: number } | undefined) =>
@@ -87,15 +91,17 @@ export function TimelineView() {
       ) : rows.length === 0 ? (
         <EmptyTimeline onAdd={() => setCreating(true)} />
       ) : (
-        <div className="space-y-2">
-          {rows.map((row) =>
-            row.kind === 'event' ? (
-              <EventCard key={`ev-${row.data.id}`} event={row.data} />
-            ) : (
-              <GapCard key={`gap-${row.data.id}`} block={row.data} onResolve={() => setResolving(row.data)} />
-            ),
-          )}
-        </div>
+        <AnimatePresence mode="popLayout">
+          <div className="space-y-2">
+            {rows.map((row) =>
+              row.kind === 'event' ? (
+                <EventCard key={`ev-${row.data.id}`} event={row.data} />
+              ) : (
+                <GapCard key={`gap-${row.data.id}`} block={row.data} onResolve={() => setResolving(row.data)} />
+              ),
+            )}
+          </div>
+        </AnimatePresence>
       )}
 
       <EventFormDialog open={creating} onOpenChange={setCreating} />
@@ -110,6 +116,7 @@ function DaySummary({
   trackedMinutes,
   gapCount,
   today,
+  events,
   onScan,
   scanning,
   onAdd,
@@ -119,6 +126,7 @@ function DaySummary({
   trackedMinutes: number
   gapCount: number
   today: boolean
+  events: TimelineEvent[]
   onScan: () => void
   scanning: boolean
   onAdd: () => void
@@ -158,8 +166,26 @@ function DaySummary({
               {eventCount} event{eventCount === 1 ? '' : 's'} · {hours}h tracked · {completion}% of waking hours
             </p>
             <div className="mt-2 h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-muted">
-              <div className={`h-full rounded-full ${statusColor} transition-all`} style={{ width: `${completion}%` }} />
+              <motion.div
+                className={`h-full rounded-full ${statusColor}`}
+                initial={{ width: 0 }}
+                animate={{ width: `${completion}%` }}
+                transition={{ duration: 0.6, ease: 'easeOut' }}
+              />
             </div>
+            {/* Category breakdown mini-bar */}
+            {trackedMinutes > 0 && (
+              <div className="mt-2 flex h-2 w-full max-w-xs overflow-hidden rounded-full bg-muted/50">
+                {getCategoryBreakdown(events).map((seg, i) => (
+                  <div
+                    key={i}
+                    className={cn('h-full', seg.color)}
+                    style={{ width: `${seg.percentage}%` }}
+                    title={`${seg.name}: ${seg.hours}h`}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -243,3 +269,39 @@ function EmptyTimeline({ onAdd }: { onAdd: () => void }) {
 
 // Unused but reserved for future hint icon
 void AlertCircle
+
+function getCategoryBreakdown(events: TimelineEvent[]): { name: string; hours: string; percentage: number; color: string }[] {
+  const map = new Map<string, number>()
+  let total = 0
+  for (const e of events) {
+    const key = e.category?.color ?? 'slate'
+    map.set(key, (map.get(key) ?? 0) + e.durationMinutes)
+    total += e.durationMinutes
+  }
+  if (total === 0) return []
+  const dotMap: Record<string, string> = {
+    emerald: 'bg-emerald-500',
+    violet: 'bg-violet-500',
+    orange: 'bg-orange-500',
+    indigo: 'bg-indigo-500',
+    amber: 'bg-amber-500',
+    rose: 'bg-rose-500',
+    slate: 'bg-slate-400',
+    yellow: 'bg-yellow-500',
+    cyan: 'bg-cyan-500',
+    teal: 'bg-teal-500',
+  }
+  return Array.from(map.entries())
+    .map(([color, minutes]) => ({
+      name: getCategoryName(color, events),
+      hours: (minutes / 60).toFixed(1),
+      percentage: (minutes / total) * 100,
+      color: dotMap[color] ?? 'bg-slate-400',
+    }))
+    .sort((a, b) => b.percentage - a.percentage)
+}
+
+function getCategoryName(color: string, events: TimelineEvent[]): string {
+  const found = events.find((e) => e.category?.color === color)
+  return found?.category?.name ?? 'Other'
+}

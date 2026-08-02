@@ -1,20 +1,23 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { motion } from 'framer-motion'
 import { useAppStore } from '@/stores/app-store'
 import { useMonthCompletion } from '@/hooks/use-data'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameMonth, isSameDay, isToday, getDay, startOfWeek, endOfWeek } from 'date-fns'
-import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react'
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameMonth, isSameDay, isToday, getDay, startOfWeek, endOfWeek, addWeeks, subWeeks, startOfDay } from 'date-fns'
+import { ChevronLeft, ChevronRight, CalendarDays, CalendarRange } from 'lucide-react'
 import type { DayCompletion } from '@/lib/types'
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 export function CalendarView() {
   const [cursor, setCursor] = useState(new Date())
+  const [viewMode, setViewMode] = useState<'month' | 'week'>('month')
   const setSelectedDate = useAppStore((s) => s.setSelectedDate)
   const setView = useAppStore((s) => s.setView)
   const selectedDate = useAppStore((s) => s.selectedDate)
@@ -43,30 +46,41 @@ export function CalendarView() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-4 px-4 py-5 md:px-6">
-      {/* Month summary header */}
+      {/* Summary header */}
       <Card className="overflow-hidden">
         <div className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <CalendarDays className="h-4 w-4 text-emerald-600" />
-              <h2 className="text-lg font-semibold">{format(cursor, 'MMMM yyyy')}</h2>
+              {viewMode === 'month' ? <CalendarDays className="h-4 w-4 text-emerald-600" /> : <CalendarRange className="h-4 w-4 text-emerald-600" />}
+              <h2 className="text-lg font-semibold">
+                {viewMode === 'month' ? format(cursor, 'MMMM yyyy') : `Week of ${format(startOfWeek(cursor, { weekStartsOn: 0 }), 'MMM d')}`}
+              </h2>
             </div>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Average completion:{' '}
-              <span className="font-semibold text-foreground">{Math.round(monthScore * 100)}%</span> · {greenDays} green ·{' '}
-              {yellowDays} yellow · {redDays} red
+              {viewMode === 'month'
+                ? <>Average completion: <span className="font-semibold text-foreground">{Math.round(monthScore * 100)}%</span> · {greenDays} green · {yellowDays} yellow · {redDays} red</>
+                : <>7-day completion overview · click any day to drill in</>
+              }
             </p>
           </div>
-          <div className="flex items-center gap-1">
-            <Button variant="outline" size="sm" onClick={() => setCursor(subMonths(cursor, 1))}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setCursor(new Date())}>
-              This month
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setCursor(addMonths(cursor, 1))}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+          <div className="flex items-center gap-2">
+            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'month' | 'week')}>
+              <TabsList className="h-8">
+                <TabsTrigger value="month" className="text-xs">Month</TabsTrigger>
+                <TabsTrigger value="week" className="text-xs">Week</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCursor(viewMode === 'month' ? subMonths(cursor, 1) : subWeeks(cursor, 1))}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" className="h-8" onClick={() => setCursor(new Date())}>
+                Today
+              </Button>
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCursor(viewMode === 'month' ? addMonths(cursor, 1) : addWeeks(cursor, 1))}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -93,6 +107,8 @@ export function CalendarView() {
               <Skeleton key={i} className="aspect-square rounded-lg" />
             ))}
           </div>
+        ) : viewMode === 'week' ? (
+          <WeekView cursor={cursor} completionMap={completionMap} selectedDate={selectedDate} onSelect={(key) => { setSelectedDate(key); setView('timeline') }} />
         ) : (
           <>
             <div className="mb-2 grid grid-cols-7 gap-2">
@@ -209,5 +225,77 @@ function SelectedDayDetail() {
         </div>
       </div>
     </Card>
+  )
+}
+
+function WeekView({ cursor, completionMap, selectedDate, onSelect }: {
+  cursor: Date
+  completionMap: Map<string, DayCompletion>
+  selectedDate: string
+  onSelect: (key: string) => void
+}) {
+  const weekStart = startOfWeek(cursor, { weekStartsOn: 0 })
+  const weekDays = eachDayOfInterval({ start: weekStart, end: new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000) })
+  const now = new Date()
+
+  return (
+    <div>
+      <div className="mb-2 grid grid-cols-7 gap-2">
+        {WEEKDAYS.map((d) => (
+          <div key={d} className="text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {d}
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-2">
+        {weekDays.map((day) => {
+          const key = format(day, 'yyyy-MM-dd')
+          const completion = completionMap.get(key)
+          const isSelected = selectedDate === key
+          const isCurrentDay = isToday(day)
+          const future = day > now && !isCurrentDay
+          const status = completion?.status
+          const barColor = status === 'green' ? 'bg-emerald-500' : status === 'yellow' ? 'bg-amber-500' : status === 'red' ? 'bg-rose-500' : 'bg-slate-300'
+          return (
+            <button
+              key={key}
+              onClick={() => !future && onSelect(key)}
+              disabled={future}
+              className={cn(
+                'group relative flex min-h-[7rem] flex-col rounded-lg border p-2 text-left transition-all',
+                future ? 'cursor-not-allowed opacity-30' : 'hover:border-emerald-500/50 hover:shadow-sm',
+                isSelected && 'ring-2 ring-emerald-500 ring-offset-1',
+                status === 'green' && 'border-emerald-500/30 bg-emerald-500/5',
+                status === 'yellow' && 'border-amber-500/30 bg-amber-500/5',
+                status === 'red' && 'border-rose-500/30 bg-rose-500/5',
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <span className={cn('text-sm font-semibold', isCurrentDay && 'text-emerald-600')}>{format(day, 'd')}</span>
+                {isCurrentDay && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
+              </div>
+              {completion && completion.totalMinutes > 0 ? (
+                <div className="mt-1.5 flex-1 space-y-1">
+                  <div className="text-[10px] font-bold text-foreground">
+                    {Math.round(completion.score * 100)}%
+                  </div>
+                  <div className="text-[9px] text-muted-foreground">
+                    {completion.eventCount} ev
+                    {completion.openBlockCount > 0 && ` · ${completion.openBlockCount} gaps`}
+                  </div>
+                  <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
+                    <div className={cn('h-full rounded-full', barColor)} style={{ width: `${Math.round(completion.score * 100)}%` }} />
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-1.5 flex-1 text-[9px] text-muted-foreground">
+                  {future ? 'Upcoming' : 'No data'}
+                </div>
+              )}
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }

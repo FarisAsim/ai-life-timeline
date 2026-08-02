@@ -96,3 +96,89 @@ Task: Build the complete AI Life Timeline application per the uploaded PRD (`AI-
 5. **Privacy controls** (§9) — data export and full-account deletion flows are not yet built; treat as launch requirement per PRD.
 6. **Companion action execution** — the LLM can emit action blocks (create_event, etc.) and they're surfaced as notes, but the actions are not yet auto-executed against the service layer. Next: parse and execute action blocks through the validated service calls.
 7. **Semantic search index** — currently uses LLM ranking over a 90-day/200-event candidate window. At scale, switch to embedding-based vector search with persistent storage.
+
+---
+
+## Task ID: 2
+Agent: main (Z.ai Code) — webDevReview cron round 1
+Task: QA pass + new features + styling polish per the recurring review prompt.
+
+### Work Log
+
+#### QA pass (agent-browser)
+- Opened `/`, checked all views — no console errors, no hydration warnings.
+- Timeline renders seeded events + gap cards correctly.
+- Tested event creation flow (works via API; HMR caused a one-off test artifact in browser).
+- Tested resolution dialog with AI Guess — LLM returned a guess with 30% confidence.
+- Calendar, Unknown Blocks, Insights, Search, Companion all verified from Task 1.
+- **Bug found & fixed**: SQLite doesn't support `mode: 'insensitive'` in Prisma queries. Removed all 5 occurrences across `category-service.ts`, `companion-service.ts`, and `categories/route.ts`. This was causing the companion action execution to crash when resolving category names.
+
+#### New feature: Companion action execution (PRD §5.3, unresolved issue #6)
+- Added `executeAction()` to `companion-service.ts` — parses LLM action blocks and executes them through the validated service layer:
+  - `create_event` → calls `createEvent()` with `source: ai_confirmed`
+  - `move_event` → calls `updateEvent()`
+  - `resolve_gap` → calls `resolveBlockWithText()`
+  - `create_reminder` → creates a notification
+- Updated the system prompt with detailed action format instructions, ISO 8601 time requirements, and examples for all 4 action types.
+- Updated `buildUserContext()` to include event IDs and block IDs so the LLM can reference them in `move_event` and `resolve_gap` actions.
+- Added `actionResult` field to `CompanionResponse` interface.
+- Updated `companion-view.tsx` to display action execution results as confirmation cards with ✓/⚠ icons and toast notifications.
+- Updated suggestion prompts to include action-triggering examples ("Add a gym session for tomorrow at 6am").
+- **Verified via curl**: sent "Create a 30min meditation event for tomorrow at 7am" → LLM replied "I'll create a 30-minute meditation event for tomorrow at 7:00 AM", action `create_event` was executed, event "Meditation" (category: Personal, source: ai_confirmed) appeared in tomorrow's timeline.
+
+#### New feature: Settings view with privacy controls (PRD §9, unresolved issue #5)
+- Created `/api/settings` (GET + PATCH) — returns user profile + data stats, allows updating name/timezone/quiet hours.
+- Created `/api/export` (GET) — full data export as JSON download (events, blocks, categories, conversations, notifications, habit model). Implements the right to data portability.
+- Created `/api/account` (DELETE) — full account deletion (right to be forgotten). Deletes all user data in dependency order and re-creates a fresh empty account with default categories.
+- Built `SettingsView` component with 5 sections:
+  - **Profile** — display name + timezone editor
+  - **Quiet hours** — start/end time inputs for notification suppression
+  - **Your data** — 6 stat boxes (events, gaps, chats, notifs, habits, categories)
+  - **Privacy & data control** — Export button (downloads JSON) + Delete button (with AlertDialog confirmation)
+  - **Demo data** — re-seed button
+- Used keyed-remount pattern for form initialization (no setState-in-render).
+
+#### New feature: Dark mode toggle
+- Added `ThemeToggle` component to sidebar footer (uses `next-themes`).
+- next-themes was already wired in Providers but had no UI toggle. Now users can switch between light and dark modes.
+- Dark mode CSS variables were already defined in `globals.css`.
+
+#### New feature: Calendar week view (PRD §5.5)
+- Added Month/Week tab toggle to CalendarView.
+- Built `WeekView` component — shows 7-day strip with per-day completion %, event count, gap count, and color-coded progress bar.
+- Navigation adapts: prev/next navigates by month or by week depending on view mode.
+
+#### Styling polish (mandatory requirement)
+- **Event cards**: rewrote with framer-motion — `layout` animation, `initial`/`animate`/`exit` transitions, animated expand/collapse with `AnimatePresence`, animated chevron rotation.
+- **Timeline day summary**: animated progress bar (motion.div with width animation), added **category breakdown mini-bar** showing proportional time per category with colored segments and tooltips.
+- **Calendar**: animated day cells, improved week view with progress bars.
+- **Companion**: markdown rendering with react-markdown (bullet lists, bold, code blocks) for assistant replies.
+- Improved duration formatting (`1h 30m` instead of `1.5h`).
+- Added `hover:shadow-emerald-500/5` glow effect on event cards.
+
+#### Verification results
+- `bun run lint` → 0 errors, 0 warnings ✅
+- All 8 API endpoints return 200 ✅
+- Settings view renders all 5 sections ✅
+- Dark mode toggle works ✅
+- Calendar week view works ✅
+- Companion action execution verified end-to-end (LLM → service layer → DB → timeline) ✅
+- Data export returns valid JSON with all entities ✅
+
+### Stage Summary
+- **3 new features added**: Companion action execution, Settings/privacy controls, Calendar week view.
+- **1 critical bug fixed**: SQLite `mode: 'insensitive'` crash in category lookups.
+- **Dark mode toggle** added.
+- **Styling significantly improved**: framer-motion animations, category breakdown bars, markdown rendering, polish across all views.
+- All features verified working via curl and agent-browser.
+- Total API routes: 12 → 15 (added settings, export, account).
+- Total views: 7 → 8 (added Settings).
+
+### Unresolved Issues / Next-phase Priorities
+1. **Auth is still stubbed** (single demo user). Next phase: wire NextAuth.js.
+2. **Attachment support** (photos, voice notes, files) — schema references exist but no upload UI/storage. Next: add file upload + object storage.
+3. **Gap detection runs on-demand** — next: add a scheduled/cron background pass.
+4. **Analytics snapshots** not yet implemented — fine at MVP scale.
+5. **Semantic search** uses LLM ranking — at scale, switch to embedding-based vector search.
+6. **Dev server stability** — the sandbox kills background `bun run dev` processes after ~60s. The system auto-restarts it, but during active development the server may be temporarily unavailable. Not a production issue.
+7. **Companion action confirmation** — actions are executed and confirmed via toast + inline message, but there's no "undo" for accidentally-created events. Next: add an undo toast for AI-created events.
