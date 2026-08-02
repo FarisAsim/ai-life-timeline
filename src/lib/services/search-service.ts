@@ -27,6 +27,7 @@ export async function semanticSearch(userId: string, query: string, limit = 20):
   const start = new Date(end.getTime() - 90 * 24 * 60 * 60 * 1000)
   const events = await db.timelineEvent.findMany({
     where: { userId, startTime: { gte: start, lte: end } },
+    include: { attachments: { where: { type: 'voice_note' }, select: { transcript: true } } },
     orderBy: { startTime: 'desc' },
     take: 200,
   })
@@ -39,7 +40,8 @@ export async function semanticSearch(userId: string, query: string, limit = 20):
   // Pre-filter with keyword matching to shrink the candidate set cheaply.
   const keywords = q.split(/\s+/).filter((w) => w.length > 2)
   const preFiltered = events.filter((e) => {
-    const hay = `${e.title} ${e.description ?? ''} ${e.notes ?? ''} ${e.location ?? ''}`.toLowerCase()
+    const voiceText = (e.attachments ?? []).map((a) => a.transcript ?? '').filter(Boolean).join(' ')
+    const hay = `${e.title} ${e.description ?? ''} ${e.notes ?? ''} ${e.location ?? ''} ${voiceText}`.toLowerCase()
     if (keywords.every((k) => hay.includes(k))) return true
     // also keep events whose category name matches
     const cat = e.categoryId ? catMap.get(e.categoryId) : null
@@ -55,7 +57,8 @@ export async function semanticSearch(userId: string, query: string, limit = 20):
     .map((e, i) => {
       const cat = e.categoryId ? catMap.get(e.categoryId) : null
       const start = format(e.startTime, 'MMM d, yyyy h:mm a')
-      return `[${i}] id=${e.id} | ${start} | "${e.title}" | cat=${cat?.name ?? 'none'} | desc=${e.description ?? ''} | loc=${e.location ?? ''}`
+      const voiceText = (e.attachments ?? []).map((a) => a.transcript ?? '').filter(Boolean).join(' / ')
+      return `[${i}] id=${e.id} | ${start} | "${e.title}" | cat=${cat?.name ?? 'none'} | desc=${e.description ?? ''} | loc=${e.location ?? ''}${voiceText ? ` | voice="${voiceText}"` : ''}`
     })
     .join('\n')
 

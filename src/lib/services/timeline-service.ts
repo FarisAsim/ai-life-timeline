@@ -181,7 +181,30 @@ export async function addAttachment(userId: string, eventId: string, file: { fil
       data: file.data,
     },
   })
-  return { id: att.id, type: att.type, filename: att.filename, mimeType: att.mimeType, size: att.size, eventId: att.eventId, hasData: true, createdAt: att.createdAt.toISOString() }
+
+  // Auto-transcribe voice notes in the background (fire-and-forget, non-blocking)
+  if (type === 'voice_note') {
+    autoTranscribe(att.id, file.data).catch(() => {
+      // Silent failure — user can retry via the Transcribe button
+    })
+  }
+
+  return { id: att.id, type: att.type, filename: att.filename, mimeType: att.mimeType, size: att.size, eventId: att.eventId, hasData: true, transcript: att.transcript, createdAt: att.createdAt.toISOString() }
+}
+
+// Background auto-transcription using ASR
+async function autoTranscribe(attachmentId: string, audioBase64: string) {
+  try {
+    const ZAI = (await import('z-ai-web-dev-sdk')).default
+    const zai = await ZAI.create()
+    const response = await zai.audio.asr.create({ file_base64: audioBase64 })
+    const text = (response as { text?: string }).text?.trim() ?? ''
+    if (text) {
+      await db.attachment.update({ where: { id: attachmentId }, data: { transcript: text } })
+    }
+  } catch {
+    // Silent failure — non-critical background task
+  }
 }
 
 export async function getAttachmentData(userId: string, attachmentId: string) {

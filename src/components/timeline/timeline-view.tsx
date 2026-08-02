@@ -8,6 +8,7 @@ import { EventCard } from './event-card'
 import { EventFormDialog } from './event-form-dialog'
 import { QuickAddButton } from './quick-add-button'
 import { TodayDashboard } from './today-dashboard'
+import { HourBar } from './hour-bar'
 import { ResolutionDialog } from '@/components/unknown-blocks/resolution-dialog'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -92,6 +93,9 @@ export function TimelineView() {
         scanning={detectGaps.isPending}
         onAdd={() => setCreating(true)}
       />
+
+      {/* Hour-by-hour visual bar */}
+      <HourBar />
 
       {/* Timeline rows */}
       {loading ? (

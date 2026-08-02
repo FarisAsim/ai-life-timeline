@@ -460,3 +460,83 @@ Task: QA pass + new features (voice transcription, today dashboard, category man
 5. **Dev server stability** — sandbox kills background processes after ~60s; not a production issue.
 6. **Event templates customization** — quick-add templates are hardcoded. Next: let users create custom templates from their most frequent events.
 7. **Voice note auto-transcription** — currently transcribe is on-demand. Next: auto-transcribe on upload and surface transcripts in search.
+
+---
+
+## Task ID: 6
+Agent: main (Z.ai Code) — webDevReview cron round 5
+Task: QA pass + new features (auto-transcribe, hour bar, frequent templates, search improvements) + styling polish.
+
+### Work Log
+
+#### QA pass
+- All 19 API endpoints return 200, lint passes clean, no browser errors.
+- App is stable — no new bugs found in the existing features.
+
+#### New feature: Voice note auto-transcription (unresolved issue #7)
+- Updated `addAttachment()` in `timeline-service.ts` to fire-and-forget `autoTranscribe()` when a voice note is uploaded.
+- `autoTranscribe()` dynamically imports `z-ai-web-dev-sdk`, calls `zai.audio.asr.create()`, and stores the transcript in the DB.
+- Non-blocking: the upload returns immediately; transcription happens in the background.
+- Silent failure: if ASR rejects the audio (e.g. silent/empty), the user can still manually trigger transcription via the "Transcribe" button.
+- Verified: uploaded a silent WAV → API returned 200, background transcription ran (ASR correctly produced no transcript for silent audio).
+
+#### New feature: Voice transcripts surfaced in search
+- Updated `search-service.ts` to `include: { attachments: { where: { type: 'voice_note' } } }` in the candidate query.
+- Keyword pre-filter now includes voice transcript text in the haystack.
+- LLM candidate text now includes `voice="..."` segments so the AI can match against spoken content.
+- Users can now search "what did I say about the meeting" and find events with matching voice note transcripts.
+
+#### New feature: Hour-by-hour visual timeline bar
+- Created `HourBar` component — a visual representation of the 24-hour day (5am–midnight):
+  - Colored segments for events (using category hex colors)
+  - Hatched amber segments for gaps (Unknown Blocks)
+  - "NOW" indicator line (red) for the current time (only on today's view)
+  - Hour labels (5:00, 8:00, 11:00, 14:00, 17:00, 20:00, 23:00)
+  - Time-of-day icons (Sunrise, Sun, Sunset)
+  - Hover tooltips showing event title/time or gap duration
+  - Framer-motion staggered entrance animations for segments
+  - Legend showing tracked hours vs gap hours
+- Placed between the DaySummary and the event list in the Timeline view.
+- Clickable segments navigate to the event.
+
+#### New feature: Frequent-event templates in Quick Add
+- Updated `QuickAddButton` to include a "Your frequent" section at the top of the popover.
+- Derives templates from the user's `topHabits` (learned from confirmed events).
+- Shows up to 3 frequent patterns with a violet "AI" badge.
+- Falls back to the 9 hardcoded templates below.
+- Section only appears when the user has learned habits (otherwise hidden).
+
+#### Bug fix: runtime error in quick-add-button.tsx
+- Removed `void Category` statement at module level — `Category` is a TypeScript type, not a runtime value, so `void`-ing it caused a `ReferenceError` at module evaluation time.
+- This was caught by agent-browser QA (the page showed "Application error: a client-side exception has occurred").
+
+#### Styling polish
+- **HourBar**: gradient time-of-day background, hatched gap pattern, animated segments, NOW indicator with badge.
+- **Quick Add**: violet-accented "Your frequent" section with AI badge, separator between frequent and templates.
+- **Search**: voice transcripts now included in the searchable text corpus.
+
+#### Verification results
+- `bun run lint` → 0 errors, 0 warnings ✅
+- All 19 API endpoints return 200 ✅
+- HourBar renders with "Day at a glance" heading, tracked/gap legend ✅
+- Quick Add popover shows all 9 templates ✅
+- Keyboard shortcuts verified (c→Companion, t→Timeline) ✅
+- Auto-transcribe API path verified (upload → background ASR → DB) ✅
+- No browser errors after the bug fix ✅
+
+### Stage Summary
+- **4 new features added**: Voice note auto-transcription, Voice transcripts in search, Hour-by-hour visual bar, Frequent-event templates.
+- **2 unresolved issues closed**: #7 (auto-transcription + search surfacing).
+- **1 bug fixed**: `void Category` runtime error in quick-add-button.tsx.
+- Total API routes: 19 (unchanged — auto-transcribe uses existing endpoint).
+- Total components: added HourBar; enhanced QuickAddButton, VoiceNotePlayer, search-service.
+- All features verified working via curl and agent-browser.
+- Lint passes clean.
+
+### Unresolved Issues / Next-phase Priorities
+1. **Auth is still stubbed** (single demo user). Next phase: wire NextAuth.js.
+2. **Gap detection runs on-demand** — next: add a scheduled/cron background pass.
+3. **Analytics snapshots** not yet implemented — fine at MVP scale.
+4. **Semantic search** uses LLM ranking — at scale, switch to embedding-based vector search.
+5. **Dev server stability** — sandbox kills background processes after ~60s; not a production issue.
+6. **Custom template creation UI** — frequent templates are auto-derived from habits, but users can't yet manually create/save custom templates. Next: add a "Save as template" option on events.

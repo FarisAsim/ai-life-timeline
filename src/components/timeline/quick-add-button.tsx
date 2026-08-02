@@ -1,12 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { useCategories, useCreateEvent } from '@/hooks/use-data'
+import { useCategories, useCreateEvent, useInsights } from '@/hooks/use-data'
 import { toast } from 'sonner'
-import { format, addMinutes } from 'date-fns'
-import { Zap, Plus, Briefcase, Dumbbell, Utensils, BookOpen, Moon, Coffee, Users, Heart, Car } from 'lucide-react'
+import { addMinutes } from 'date-fns'
+import { Zap, Plus, Briefcase, Dumbbell, Utensils, BookOpen, Moon, Coffee, Users, Heart, Car, History } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface Template {
@@ -32,10 +32,33 @@ const TEMPLATES: Template[] = [
 export function QuickAddButton({ date }: { date: string }) {
   const [open, setOpen] = useState(false)
   const { data: categories } = useCategories()
+  const { data: insights } = useInsights(30)
   const createMut = useCreateEvent()
 
+  // Derive frequent-event templates from the user's actual history
+  const frequentTemplates = useMemo(() => {
+    if (!insights || !categories) return []
+    // Group events by title to find frequency; we need raw events but insights only has aggregates.
+    // Instead, use the category breakdown + habit model to suggest templates.
+    // For a simpler approach: use topHabits to suggest time-based templates.
+    const habits = insights.topHabits ?? []
+    const catMap = new Map(categories.map((c) => [c.id, c]))
+    return habits
+      .filter((h) => h.categoryId)
+      .slice(0, 3)
+      .map((h) => {
+        const cat = catMap.get(h.categoryId!)
+        return {
+          title: h.eventName || cat?.name || 'Activity',
+          categoryName: cat?.name ?? 'Personal',
+          durationMin: 60, // default
+          icon: History,
+          color: 'text-violet-600',
+        }
+      })
+  }, [insights, categories])
+
   const addFromTemplate = (tpl: Template) => {
-    // Default to "now" if today, or noon if a past/future day
     const dayDate = new Date(date + 'T00:00:00')
     const now = new Date()
     const isToday = dayDate.toDateString() === now.toDateString()
@@ -70,8 +93,36 @@ export function QuickAddButton({ date }: { date: string }) {
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-72 p-2" align="end">
+        {/* Frequent events from user history */}
+        {frequentTemplates.length > 0 && (
+          <>
+            <div className="mb-1 flex items-center gap-1.5 px-2 text-[10px] font-semibold uppercase tracking-wide text-violet-600">
+              <History className="h-3 w-3" />
+              Your frequent
+            </div>
+            <div className="grid grid-cols-1 gap-0.5">
+              {frequentTemplates.map((tpl, i) => {
+                const Icon = tpl.icon
+                return (
+                  <button
+                    key={`freq-${i}`}
+                    onClick={() => addFromTemplate(tpl)}
+                    disabled={createMut.isPending}
+                    className="group flex items-center gap-2.5 rounded-md bg-violet-500/5 px-2 py-1.5 text-left text-xs transition-colors hover:bg-violet-500/10 disabled:opacity-50"
+                  >
+                    <Icon className={cn('h-3.5 w-3.5 shrink-0', tpl.color)} />
+                    <span className="flex-1 font-medium">{tpl.title}</span>
+                    <span className="text-[9px] text-violet-500">AI</span>
+                  </button>
+                )
+              })}
+            </div>
+            <div className="my-1.5 border-t" />
+          </>
+        )}
+
         <div className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Quick add template
+          Templates
         </div>
         <div className="grid grid-cols-1 gap-0.5">
           {TEMPLATES.map((tpl) => {
