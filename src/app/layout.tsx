@@ -1,0 +1,58 @@
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as SonnerToaster } from "@/components/ui/sonner";
+import { Providers } from "@/components/providers";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: "AI Life Timeline — Never lose a moment.",
+  description:
+    "An AI-assisted, hour-by-hour record of your life. The timeline actively detects unexplained time, asks about it, and gets smarter every time you answer.",
+  keywords: [
+    "life timeline",
+    "time tracking",
+    "AI companion",
+    "life logging",
+    "habit tracking",
+  ],
+  authors: [{ name: "AI Life Timeline" }],
+  icons: {
+    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+  },
+  openGraph: {
+    title: "AI Life Timeline",
+    description: "Never lose a moment. An AI that notices when it doesn't know what you were doing.",
+    type: "website",
+  },
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
+      >
+        <Providers>
+          {children}
+          <Toaster />
+          <SonnerToaster position="top-right" richColors />
+        </Providers>
+      </body>
+    </html>
+  );
+}

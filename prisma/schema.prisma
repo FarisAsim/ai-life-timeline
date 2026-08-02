@@ -1,0 +1,149 @@
+// AI Life Timeline - Prisma Schema
+// "Never lose a moment." — an AI-assisted hour-by-hour record of life.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  timezone  String   @default("Africa/Cairo")
+  quietHoursStart String? // "22:00"
+  quietHoursEnd   String? // "07:00"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  events        TimelineEvent[]
+  unknownBlocks UnknownBlock[]
+  categories    Category[]
+  conversations AIConversation[]
+  notifications Notification[]
+  habits        HabitPattern[]
+}
+
+model Category {
+  id        String  @id @default(cuid())
+  userId    String
+  name      String
+  color     String  // tailwind/hex color token
+  icon      String?
+  isDefault Boolean @default(false)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events    TimelineEvent[]
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model TimelineEvent {
+  id              String   @id @default(cuid())
+  userId          String
+  title           String
+  description     String?
+  startTime       DateTime
+  endTime         DateTime
+  durationMinutes Int
+  location        String?
+  notes           String?
+  categoryId      String?
+  confidenceScore Float    @default(1.0)
+  source          String   @default("user_manual") // user_manual | ai_guess | ai_confirmed | integration
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category      Category?      @relation(fields: [categoryId], references: [id])
+  resolvedBlock UnknownBlock?
+
+  @@index([userId, startTime, endTime])
+  @@index([userId, categoryId])
+  @@index([userId, source])
+}
+
+model UnknownBlock {
+  id               String   @id @default(cuid())
+  userId           String
+  startTime        DateTime
+  endTime          DateTime
+  durationMinutes  Int
+  status           String   @default("open") // open | resolved | ai_guessed_pending_confirmation | unknown_confirmed
+  severity         String   @default("low")  // low | medium | high
+  resolutionSource String?  // voice | text | ai_guess | confirmed_unknown
+  resolvedEventId  String?  @unique
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resolvedEvent TimelineEvent? @relation(fields: [resolvedEventId], references: [id])
+
+  @@index([userId, status])
+  @@index([userId, startTime])
+}
+
+model AIConversation {
+  id        String    @id @default(cuid())
+  userId    String
+  title     String    @default("Conversation")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user     User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages AIMessage[]
+
+  @@index([userId])
+}
+
+model AIMessage {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String   // user | assistant
+  content        String
+  metadata       String?  // JSON string for actions taken (e.g. created event)
+  createdAt      DateTime @default(now())
+
+  conversation AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+}
+
+model Notification {
+  id            String   @id @default(cuid())
+  userId        String
+  type          String   // gap_prompt | pre_event | state_change | insight | ai_guess
+  title         String
+  body          String
+  actionType    String?  // resolve_gap | view_event | view_insight
+  actionPayload String?  // JSON
+  isRead        Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+}
+
+model HabitPattern {
+  id          String   @id @default(cuid())
+  userId      String
+  patternType String   // time_of_day | day_of_week | location
+  patternKey  String   // e.g. "morning", "monday", "home"
+  categoryId  String?
+  eventName   String?
+  frequency   Int      @default(1)
+  confidence  Float    @default(0.5)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, patternType, patternKey])
+  @@index([userId])
+}
