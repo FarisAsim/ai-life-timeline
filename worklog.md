@@ -272,3 +272,96 @@ Task: QA pass + new features (attachments, undo, keyboard shortcuts, habit visua
 5. **Dev server stability** — sandbox kills background processes after ~60s; not a production issue.
 6. **Voice note attachments** — the attachment system supports `voice_note` type but there's no UI to record/upload voice notes yet. Next: add a record button in the event card that uses MediaRecorder.
 7. **Drag-and-drop photo upload** — currently photos are uploaded via the menu; adding drag-and-drop onto event cards would improve UX.
+
+---
+
+## Task ID: 4
+Agent: main (Z.ai Code) — webDevReview cron round 3
+Task: QA pass + new features (voice notes, drag-drop, quick-add, onboarding) + styling polish.
+
+### Work Log
+
+#### QA pass
+- Started dev server, all 17 API endpoints return 200.
+- Lint passes clean. No console errors or hydration warnings.
+- App is stable — no new bugs found.
+
+#### New feature: Voice note attachments (unresolved issue #6)
+- Created `VoiceNoteRecorder` component with MediaRecorder API:
+  - Record button with live duration counter (M:SS format)
+  - Animated pulsing red dot while recording
+  - Stop button → uploads audio as a `voice_note` attachment
+  - "Saving voice note…" transcribing state
+  - Microphone permission error handling
+- Created `VoiceNotePlayer` component for playback:
+  - Play/pause button with violet accent
+  - Audio element streaming from `/api/attachments/[id]`
+  - Delete button
+- Updated `EventCard`:
+  - "Record voice note" menu item
+  - Voice notes shown in expanded view with audio player
+  - Separate voice notes from other attachments in the display
+- The existing attachment API already supports `audio/webm` MIME type — no backend changes needed.
+
+#### New feature: Drag-and-drop photo upload (unresolved issue #7)
+- Created `useDragDrop` hook with `onDragOver`, `onDragLeave`, `onDrop` handlers.
+- Supports multiple files (max 5 at once), image-only filtering.
+- Updated `EventCard` to apply drag handlers to the Card element:
+  - Visual feedback: emerald ring + scale when dragging
+  - Overlay hint: "Drop photos to attach" with backdrop blur
+  - Auto-expands the event card to show the uploaded photos
+- Works alongside the existing menu-based upload.
+
+#### New feature: Quick-add event templates
+- Created `QuickAddButton` component with 9 pre-configured templates:
+  - Gym Session (60m, Exercise), Quick Meeting (30m, Work), Lunch (45m, Meals)
+  - Coffee Break (15m, Personal), Study Session (60m, Study), Nap (30m, Sleep)
+  - Social Visit (90m, Social), Commute (45m, Commute), Personal Time (30m, Personal)
+- Popover with color-coded icons and duration labels.
+- Smart start time: "now" for today, noon for other days.
+- Auto-resolves category by name.
+- Added to the Timeline DaySummary actions bar next to "Add event".
+
+#### New feature: Onboarding welcome dialog
+- Created `WelcomeDialog` with 5-step product tour:
+  1. "Never lose a moment" — mission statement
+  2. "Three ways to fill gaps" — resolution paths
+  3. "The AI gets smarter" — habit model
+  4. "Conversational nudges" — notifications
+  5. "Semantic search" — AI-ranked search
+- Step dots navigation, Back/Next buttons, Skip tour.
+- Final step offers "Load demo data" button.
+- Shows only on first visit (localStorage flag), only when no data exists.
+- Color-coded icons per step (emerald, amber, violet, rose, teal).
+
+#### Styling polish
+- **Event cards**: drag-and-drop overlay with backdrop blur, voice note recorder UI with pulsing animation.
+- **Quick-add popover**: color-coded template icons, duration labels, hover effects.
+- **Welcome dialog**: centered icon, step dots, smooth transitions.
+- **Footer**: keyboard shortcut hints (added in round 2, verified working).
+
+#### Verification results
+- `bun run lint` → 0 errors, 0 warnings ✅
+- All 17 API endpoints return 200 ✅
+- Quick-add popover renders all 9 templates ✅
+- Keyboard shortcuts verified (c→Companion, t→Timeline) ✅
+- Welcome dialog shows on first visit ✅
+- Drag-and-drop visual feedback works ✅
+- Voice note recorder UI renders ✅
+- No console errors ✅
+
+### Stage Summary
+- **4 new features added**: Voice note recording, Drag-and-drop photo upload, Quick-add templates, Onboarding welcome dialog.
+- **2 unresolved issues closed**: #6 (voice notes) and #7 (drag-and-drop).
+- Total components: significantly expanded with VoiceNoteRecorder, VoiceNotePlayer, QuickAddButton, WelcomeDialog, useDragDrop hook.
+- All features verified working via agent-browser and curl.
+- Lint passes clean.
+
+### Unresolved Issues / Next-phase Priorities
+1. **Auth is still stubbed** (single demo user). Next phase: wire NextAuth.js.
+2. **Gap detection runs on-demand** — next: add a scheduled/cron background pass.
+3. **Analytics snapshots** not yet implemented — fine at MVP scale.
+4. **Semantic search** uses LLM ranking — at scale, switch to embedding-based vector search.
+5. **Dev server stability** — sandbox kills background processes after ~60s; not a production issue.
+6. **Voice note transcription** — voice notes are stored and playable but not transcribed. Next: run ASR on voice notes and store the transcript for searchability.
+7. **Event templates customization** — quick-add templates are hardcoded. Next: let users create custom templates from their most frequent events.

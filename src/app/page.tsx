@@ -12,7 +12,8 @@ import { CompanionView } from '@/components/companion/companion-view'
 import { InsightsView } from '@/components/insights/insights-view'
 import { SearchView } from '@/components/search/search-view'
 import { SettingsView } from '@/components/settings/settings-view'
-import { useSeed } from '@/hooks/use-data'
+import { WelcomeDialog } from '@/components/onboarding/welcome-dialog'
+import { useSeed, useSettings } from '@/hooks/use-data'
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts'
 import { toast } from 'sonner'
 import { Sparkles } from 'lucide-react'
@@ -20,6 +21,7 @@ import { Sparkles } from 'lucide-react'
 export default function Home() {
   const view = useAppStore((s) => s.view)
   const seed = useSeed()
+  const { data: settings } = useSettings()
 
   useKeyboardShortcuts()
 
@@ -57,6 +59,9 @@ export default function Home() {
       {view !== 'companion' && <CompanionFab />}
 
       <NotificationsPanel />
+
+      {/* Onboarding welcome dialog (shows on first visit with no data) */}
+      <WelcomeDialog hasData={(settings?.stats?.eventCount ?? 0) > 0} />
 
       {/* Sticky footer */}
       <footer className="fixed bottom-0 left-0 right-0 z-10 border-t bg-background/80 backdrop-blur-md">

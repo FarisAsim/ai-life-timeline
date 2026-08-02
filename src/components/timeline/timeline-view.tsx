@@ -6,6 +6,7 @@ import { useAppStore } from '@/stores/app-store'
 import { useTimelineDay, useUnknownBlocks, useDetectGaps } from '@/hooks/use-data'
 import { EventCard } from './event-card'
 import { EventFormDialog } from './event-form-dialog'
+import { QuickAddButton } from './quick-add-button'
 import { ResolutionDialog } from '@/components/unknown-blocks/resolution-dialog'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -75,6 +76,7 @@ export function TimelineView() {
         gapCount={rows.filter((r) => r.kind === 'gap').length}
         today={today}
         events={events ?? []}
+        dateISO={selectedDate}
         onScan={() => {
           detectGaps.mutate(selectedDate, {
             onSuccess: (d: { count?: number } | undefined) =>
@@ -123,6 +125,7 @@ function DaySummary({
   gapCount,
   today,
   events,
+  dateISO,
   onScan,
   scanning,
   onAdd,
@@ -133,6 +136,7 @@ function DaySummary({
   gapCount: number
   today: boolean
   events: TimelineEvent[]
+  dateISO: string
   onScan: () => void
   scanning: boolean
   onAdd: () => void
@@ -195,11 +199,12 @@ function DaySummary({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={onScan} disabled={scanning}>
             <ScanLine className="mr-1.5 h-3.5 w-3.5" />
             {scanning ? 'Scanning…' : 'Scan for gaps'}
           </Button>
+          <QuickAddButton date={dateISO} />
           <Button size="sm" onClick={onAdd} className="bg-emerald-600 hover:bg-emerald-700">
             <Plus className="mr-1.5 h-3.5 w-3.5" />
             Add event

@@ -8,14 +8,16 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Badge } from '@/components/ui/badge'
 import { EventFormDialog, formatTimeRange } from './event-form-dialog'
 import { useDeleteEvent, useUploadAttachment, useDeleteAttachment, attachmentUrl } from '@/hooks/use-data'
+import { useDragDrop } from '@/hooks/use-drag-drop'
 import type { TimelineEvent } from '@/lib/types'
 import { CATEGORY_COLOR_MAP, SOURCE_LABELS } from '@/lib/types'
 import { format } from 'date-fns'
 import {
-  MoreVertical, Pencil, Trash2, MapPin, Clock, AlignLeft, StickyNote, ChevronDown, Sparkles, Bot, Paperclip, Image as ImageIcon, FileText, X, Loader2,
+  MoreVertical, Pencil, Trash2, MapPin, Clock, AlignLeft, StickyNote, ChevronDown, Sparkles, Bot, Paperclip, Image as ImageIcon, FileText, X, Loader2, Mic,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { VoiceNoteRecorder, VoiceNotePlayer } from './voice-note-recorder'
 
 export function EventCard({ event }: { event: TimelineEvent }) {
   const [expanded, setExpanded] = useState(false)
@@ -25,13 +27,15 @@ export function EventCard({ event }: { event: TimelineEvent }) {
   const uploadMut = useUploadAttachment()
   const deleteAttMut = useDeleteAttachment()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { isDragging, dragHandlers, dropzoneClassName } = useDragDrop({ eventId: event.id, onUploaded: () => setExpanded(true) })
 
   const color = event.category ? (CATEGORY_COLOR_MAP[event.category.color] ?? CATEGORY_COLOR_MAP.slate) : null
   const start = new Date(event.startTime)
   const isAiSource = event.source === 'ai_guess' || event.source === 'ai_confirmed'
   const hasExtras = !!(event.description || event.notes || event.location || event.attachments.length > 0)
   const photoAttachments = event.attachments.filter((a) => a.type === 'photo')
-  const otherAttachments = event.attachments.filter((a) => a.type !== 'photo')
+  const voiceAttachments = event.attachments.filter((a) => a.type === 'voice_note')
+  const otherAttachments = event.attachments.filter((a) => a.type !== 'photo' && a.type !== 'voice_note')
 
   const handleDelete = () => {
     deleteMut.mutate(event.id, {
@@ -50,11 +54,23 @@ export function EventCard({ event }: { event: TimelineEvent }) {
         transition={{ duration: 0.2, ease: 'easeOut' }}
       >
         <Card
+          {...dragHandlers}
           className={cn(
             'group relative overflow-hidden border-l-4 py-0 transition-all hover:shadow-md hover:shadow-emerald-500/5',
+            dropzoneClassName,
+            isDragging && 'border-emerald-500/60 bg-emerald-500/5',
           )}
           style={color ? { borderLeftColor: getCategoryHex(event.category?.color) } : { borderLeftColor: '#cbd5e1' }}
         >
+          {/* Drag overlay hint */}
+          {isDragging && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-emerald-500/10 backdrop-blur-[1px]">
+              <div className="flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-lg">
+                <Paperclip className="h-3.5 w-3.5" />
+                Drop photos to attach
+              </div>
+            </div>
+          )}
           {/* Color strip */}
           <div className={cn('absolute inset-y-0 left-0 w-1.5', color?.dot ?? 'bg-slate-300')} />
           <div className="flex items-stretch gap-3 pl-3.5 pr-3 py-3">
@@ -135,6 +151,9 @@ export function EventCard({ event }: { event: TimelineEvent }) {
                       <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
                         <Paperclip className="mr-2 h-3.5 w-3.5" /> Attach photo
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setExpanded(true)}>
+                        <Mic className="mr-2 h-3.5 w-3.5" /> Record voice note
+                      </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem className="text-rose-600 focus:text-rose-600" onClick={handleDelete}>
                         <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
@@ -188,6 +207,21 @@ export function EventCard({ event }: { event: TimelineEvent }) {
                           ))}
                         </div>
                       )}
+                      {/* Voice notes */}
+                      {voiceAttachments.length > 0 && (
+                        <div className="space-y-1">
+                          {voiceAttachments.map((att) => (
+                            <VoiceNotePlayer
+                              key={att.id}
+                              attachmentId={att.id}
+                              filename={att.filename}
+                              onDelete={() => deleteAttMut.mutate(att.id, { onSuccess: () => toast.success('Voice note removed') })}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      {/* Voice note recorder */}
+                      <VoiceNoteRecorder eventId={event.id} onDone={() => setExpanded(true)} />
                       {/* Other attachments */}
                       {otherAttachments.length > 0 && (
                         <div className="space-y-1">
