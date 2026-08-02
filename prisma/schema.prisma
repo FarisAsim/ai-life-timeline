@@ -26,6 +26,8 @@ model User {
   conversations AIConversation[]
   notifications Notification[]
   habits        HabitPattern[]
+  templates     EventTemplate[]
+  goals         Goal[]
 }
 
 model Category {
@@ -37,6 +39,7 @@ model Category {
   isDefault Boolean @default(false)
   user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   events    TimelineEvent[]
+  templates EventTemplate[]
 
   @@unique([userId, name])
   @@index([userId])
@@ -164,5 +167,38 @@ model HabitPattern {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, patternType, patternKey])
+  @@index([userId])
+}
+
+model EventTemplate {
+  id            String   @id @default(cuid())
+  userId        String
+  title         String
+  categoryId    String?
+  durationMin   Int      @default(60)
+  description   String?
+  icon          String?  // lucide icon name
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  user User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id])
+
+  @@index([userId])
+}
+
+model Goal {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  type        String   // category_hours | event_count | completion_pct
+  categoryId  String?
+  targetValue Float    // e.g. 10 hours, 5 events, 85%
+  period      String   // weekly | monthly
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId])
 }

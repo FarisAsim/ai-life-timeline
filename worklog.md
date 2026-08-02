@@ -540,3 +540,81 @@ Task: QA pass + new features (auto-transcribe, hour bar, frequent templates, sea
 4. **Semantic search** uses LLM ranking — at scale, switch to embedding-based vector search.
 5. **Dev server stability** — sandbox kills background processes after ~60s; not a production issue.
 6. **Custom template creation UI** — frequent templates are auto-derived from habits, but users can't yet manually create/save custom templates. Next: add a "Save as template" option on events.
+
+---
+
+## Task ID: 7
+Agent: main (Z.ai Code) — webDevReview cron round 6
+Task: QA pass + new features (custom templates, weekly goals) + styling polish.
+
+### Work Log
+
+#### QA pass
+- All 19 API endpoints return 200, lint passes clean, no browser errors.
+- App is stable — no new bugs found.
+
+#### New feature: Custom event templates — "Save as template" (unresolved issue #6)
+- Added `EventTemplate` model to Prisma schema (`id, userId, title, categoryId, durationMin, description, icon, sortOrder`).
+- Added `Goal` model at the same time (for the goals feature below).
+- Created `template-service.ts` with `listTemplates()`, `createTemplate()`, `deleteTemplate()`.
+- Created 2 API routes: `GET|POST /api/templates`, `DELETE /api/templates/[id]`.
+- Added `useTemplates`, `useCreateTemplate`, `useDeleteTemplate` hooks.
+- Updated `EventCard` dropdown menu with "Save as template" option (Star icon):
+  - Saves the event's title, category, duration, and description as a reusable template.
+  - Toast confirmation on success.
+- Updated `QuickAddButton` popover with a new "Saved templates" section (amber-accented, Star icon):
+  - Shows above the hardcoded templates.
+  - Each template shows title and duration.
+  - Clicking creates an event with that template's properties.
+- Verified: saved "Template Source" (Exercise, 45m) → appeared in Quick Add popover under "Saved templates".
+
+#### New feature: Weekly/monthly goals with progress tracking
+- Created `goal-service.ts` with `listGoals()`, `createGoal()`, `deleteGoal()`.
+- Goals support 3 types:
+  - `category_hours` — track hours in a specific category (e.g. "10 hours of Exercise per week")
+  - `event_count` — track number of events (e.g. "5 gym sessions per week")
+  - `completion_pct` — track overall timeline completion percentage
+- Each goal computes its current value from the timeline data (last 7 or 30 days).
+- Progress shown as 0–100% with color-coded bars (green ≥100%, amber ≥50%, rose <50%).
+- Created 2 API routes: `GET|POST /api/goals`, `DELETE /api/goals/[id]`.
+- Added `useGoals`, `useCreateGoal`, `useDeleteGoal` hooks.
+- Created `GoalsWidget` component for the Insights view:
+  - Card with "New goal" popover button.
+  - Form with title, type, period (weekly/monthly), category, and target value.
+  - List of goals with animated progress bars, current/target values, and delete buttons.
+  - Achieved goals show a green checkmark.
+  - Empty state with icon and descriptive text.
+- Placed between the daily trend chart and the learned habits in Insights.
+- Verified: created "Exercise 5x per week" goal → showed 7/5 (140%, exceeded!) with green bar.
+
+#### Styling polish
+- **Quick Add**: amber-accented "Saved templates" section with Star icons, separated from frequent and hardcoded sections.
+- **Event Card**: new "Save as template" menu item with Star icon.
+- **Goals Widget**: animated progress bars with color-coded states, achievement checkmarks, hover-reveal delete, popover form with categorized inputs.
+- **Insights**: Goals section adds a new interactive dimension to the analytics view.
+
+#### Verification results
+- `bun run lint` → 0 errors, 0 warnings ✅
+- All 21 API endpoints return 200 ✅ (added templates + goals routes)
+- Template creation + display in Quick Add verified ✅
+- Goal creation + progress computation verified (7/5 = 140%) ✅
+- Goals widget renders in Insights with "New goal" button ✅
+- No browser errors ✅
+
+### Stage Summary
+- **2 new features added**: Custom event templates ("Save as template"), Weekly/monthly goals with progress tracking.
+- **1 unresolved issue closed**: #6 (custom template creation UI).
+- Total API routes: 19 → 23 (added templates GET/POST/DELETE + goals GET/POST/DELETE).
+- Total Prisma models: 9 → 11 (added EventTemplate + Goal).
+- Total components: added GoalsWidget; enhanced EventCard (save as template), QuickAddButton (saved templates section).
+- All features verified working via curl and agent-browser.
+- Lint passes clean.
+
+### Unresolved Issues / Next-phase Priorities
+1. **Auth is still stubbed** (single demo user). Next phase: wire NextAuth.js.
+2. **Gap detection runs on-demand** — next: add a scheduled/cron background pass.
+3. **Analytics snapshots** not yet implemented — fine at MVP scale.
+4. **Semantic search** uses LLM ranking — at scale, switch to embedding-based vector search.
+5. **Dev server stability** — sandbox kills background processes after ~60s; not a production issue.
+6. **Template management UI** — templates can be created and used but not yet managed (renamed/deleted) from a dedicated settings page. Next: add a template manager to Settings.
+7. **Goal notifications** — goals don't yet trigger notifications when achieved or at risk. Next: notify on goal completion and weekly summary.

@@ -469,3 +469,101 @@ export function useDeleteAttachment() {
 export function attachmentUrl(id: string) {
   return `/api/attachments/${id}`
 }
+
+// ---------- Event Templates ----------
+export function useTemplates() {
+  const refreshTick = useAppStore((s) => s.refreshTick)
+  return useQuery({
+    queryKey: ['templates', refreshTick],
+    queryFn: async () => {
+      const r = await fetch('/api/templates')
+      const j = await r.json()
+      return j.templates
+    },
+  })
+}
+
+export function useCreateTemplate() {
+  const qc = useQueryClient()
+  const triggerRefresh = useAppStore((s) => s.triggerRefresh)
+  return useMutation({
+    mutationFn: async (vars: { title: string; categoryId?: string | null; durationMin?: number; description?: string }) => {
+      const r = await fetch('/api/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(vars),
+      })
+      if (!r.ok) throw new Error('Failed to create template')
+      return r.json()
+    },
+    onSuccess: () => {
+      triggerRefresh()
+      qc.invalidateQueries({ queryKey: ['templates'] })
+    },
+  })
+}
+
+export function useDeleteTemplate() {
+  const qc = useQueryClient()
+  const triggerRefresh = useAppStore((s) => s.triggerRefresh)
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const r = await fetch(`/api/templates/${id}`, { method: 'DELETE' })
+      if (!r.ok) throw new Error('Failed to delete template')
+      return r.json()
+    },
+    onSuccess: () => {
+      triggerRefresh()
+      qc.invalidateQueries({ queryKey: ['templates'] })
+    },
+  })
+}
+
+// ---------- Goals ----------
+export function useGoals() {
+  const refreshTick = useAppStore((s) => s.refreshTick)
+  return useQuery({
+    queryKey: ['goals', refreshTick],
+    queryFn: async () => {
+      const r = await fetch('/api/goals')
+      const j = await r.json()
+      return j.goals
+    },
+  })
+}
+
+export function useCreateGoal() {
+  const qc = useQueryClient()
+  const triggerRefresh = useAppStore((s) => s.triggerRefresh)
+  return useMutation({
+    mutationFn: async (vars: { title: string; type: string; categoryId?: string | null; targetValue: number; period: string }) => {
+      const r = await fetch('/api/goals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(vars),
+      })
+      if (!r.ok) throw new Error('Failed to create goal')
+      return r.json()
+    },
+    onSuccess: () => {
+      triggerRefresh()
+      qc.invalidateQueries({ queryKey: ['goals'] })
+    },
+  })
+}
+
+export function useDeleteGoal() {
+  const qc = useQueryClient()
+  const triggerRefresh = useAppStore((s) => s.triggerRefresh)
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const r = await fetch(`/api/goals/${id}`, { method: 'DELETE' })
+      if (!r.ok) throw new Error('Failed to delete goal')
+      return r.json()
+    },
+    onSuccess: () => {
+      triggerRefresh()
+      qc.invalidateQueries({ queryKey: ['goals'] })
+    },
+  })
+}

@@ -3,10 +3,10 @@
 import { useState, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { useCategories, useCreateEvent, useInsights } from '@/hooks/use-data'
+import { useCategories, useCreateEvent, useInsights, useTemplates } from '@/hooks/use-data'
 import { toast } from 'sonner'
 import { addMinutes } from 'date-fns'
-import { Zap, Plus, Briefcase, Dumbbell, Utensils, BookOpen, Moon, Coffee, Users, Heart, Car, History } from 'lucide-react'
+import { Zap, Plus, Briefcase, Dumbbell, Utensils, BookOpen, Moon, Coffee, Users, Heart, Car, History, Star, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface Template {
@@ -33,6 +33,7 @@ export function QuickAddButton({ date }: { date: string }) {
   const [open, setOpen] = useState(false)
   const { data: categories } = useCategories()
   const { data: insights } = useInsights(30)
+  const { data: customTemplates } = useTemplates()
   const createMut = useCreateEvent()
 
   // Derive frequent-event templates from the user's actual history
@@ -116,6 +117,31 @@ export function QuickAddButton({ date }: { date: string }) {
                   </button>
                 )
               })}
+            </div>
+            <div className="my-1.5 border-t" />
+          </>
+        )}
+
+        {/* Custom saved templates */}
+        {customTemplates && customTemplates.length > 0 && (
+          <>
+            <div className="mb-1 flex items-center gap-1.5 px-2 text-[10px] font-semibold uppercase tracking-wide text-amber-600">
+              <Star className="h-3 w-3" />
+              Saved templates
+            </div>
+            <div className="grid grid-cols-1 gap-0.5">
+              {customTemplates.map((tpl: { id: string; title: string; categoryId: string | null; category: { name: string; color: string } | null; durationMin: number }) => (
+                <button
+                  key={tpl.id}
+                  onClick={() => addFromTemplate({ title: tpl.title, categoryName: tpl.category?.name ?? 'Personal', durationMin: tpl.durationMin, icon: Star, color: 'text-amber-600' })}
+                  disabled={createMut.isPending}
+                  className="group flex items-center gap-2.5 rounded-md bg-amber-500/5 px-2 py-1.5 text-left text-xs transition-colors hover:bg-amber-500/10 disabled:opacity-50"
+                >
+                  <Star className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                  <span className="flex-1 font-medium">{tpl.title}</span>
+                  <span className="text-[10px] text-muted-foreground">{tpl.durationMin}m</span>
+                </button>
+              ))}
             </div>
             <div className="my-1.5 border-t" />
           </>

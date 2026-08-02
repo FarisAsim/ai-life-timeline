@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useInsights } from '@/hooks/use-data'
 import { Card } from '@/components/ui/card'
+import { GoalsWidget } from './goals-widget'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { CategoryBadge, CategoryDot } from '@/components/category-icon'
@@ -217,6 +218,9 @@ export function InsightsView() {
           </ResponsiveContainer>
         </div>
       </Card>
+
+      {/* Goals */}
+      <GoalsWidget />
 
       {/* Learned habits */}
       <Card className="p-5">

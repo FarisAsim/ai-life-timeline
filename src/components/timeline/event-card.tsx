@@ -7,13 +7,13 @@ import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
 import { EventFormDialog, formatTimeRange } from './event-form-dialog'
-import { useDeleteEvent, useUploadAttachment, useDeleteAttachment, attachmentUrl } from '@/hooks/use-data'
+import { useDeleteEvent, useUploadAttachment, useDeleteAttachment, attachmentUrl, useCreateTemplate } from '@/hooks/use-data'
 import { useDragDrop } from '@/hooks/use-drag-drop'
 import type { TimelineEvent } from '@/lib/types'
 import { CATEGORY_COLOR_MAP, SOURCE_LABELS } from '@/lib/types'
 import { format } from 'date-fns'
 import {
-  MoreVertical, Pencil, Trash2, MapPin, Clock, AlignLeft, StickyNote, ChevronDown, Sparkles, Bot, Paperclip, Image as ImageIcon, FileText, X, Loader2, Mic,
+  MoreVertical, Pencil, Trash2, MapPin, Clock, AlignLeft, StickyNote, ChevronDown, Sparkles, Bot, Paperclip, Image as ImageIcon, FileText, X, Loader2, Mic, Star,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -26,6 +26,7 @@ export function EventCard({ event }: { event: TimelineEvent }) {
   const deleteMut = useDeleteEvent()
   const uploadMut = useUploadAttachment()
   const deleteAttMut = useDeleteAttachment()
+  const createTemplateMut = useCreateTemplate()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { isDragging, dragHandlers, dropzoneClassName } = useDragDrop({ eventId: event.id, onUploaded: () => setExpanded(true) })
 
@@ -42,6 +43,21 @@ export function EventCard({ event }: { event: TimelineEvent }) {
       onSuccess: () => toast.success('Event deleted'),
       onError: () => toast.error('Failed to delete'),
     })
+  }
+
+  const handleSaveAsTemplate = () => {
+    createTemplateMut.mutate(
+      {
+        title: event.title,
+        categoryId: event.categoryId,
+        durationMin: event.durationMinutes,
+        description: event.description ?? undefined,
+      },
+      {
+        onSuccess: () => toast.success(`"${event.title}" saved as template`),
+        onError: () => toast.error('Failed to save template'),
+      },
+    )
   }
 
   return (
@@ -153,6 +169,9 @@ export function EventCard({ event }: { event: TimelineEvent }) {
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setExpanded(true)}>
                         <Mic className="mr-2 h-3.5 w-3.5" /> Record voice note
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleSaveAsTemplate}>
+                        <Star className="mr-2 h-3.5 w-3.5" /> Save as template
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem className="text-rose-600 focus:text-rose-600" onClick={handleDelete}>
