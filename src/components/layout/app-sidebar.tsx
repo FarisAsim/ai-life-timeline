@@ -4,6 +4,8 @@ import { useAppStore } from '@/stores/app-store'
 import { cn } from '@/lib/utils'
 import { useNotifications } from '@/hooks/use-data'
 import { useTheme } from 'next-themes'
+import { useLocaleStore } from '@/stores/locale-store'
+import { useTranslation } from '@/hooks/use-translation'
 import {
   CalendarDays, Clock, Compass, LayoutList, Bell, Search, Sparkles,
   Hourglass, CircleHelp, Menu, X, Settings, Sun, Moon, Languages,
@@ -11,15 +13,14 @@ import {
 import type { ViewName } from '@/lib/types'
 import { useEffect, useState } from 'react'
 import { StreakBadge } from './streak-badge'
-import { useLocaleStore } from '@/stores/locale-store'
 
-const NAV_ITEMS: { id: ViewName; label: string; icon: typeof Clock; description: string }[] = [
-  { id: 'timeline', label: 'Timeline', icon: LayoutList, description: 'Hour-by-hour record of your day' },
-  { id: 'calendar', label: 'Calendar', icon: CalendarDays, description: 'Completion score by day' },
-  { id: 'unknown', label: 'Unknown Blocks', icon: CircleHelp, description: 'Gaps the AI wants to fill' },
-  { id: 'companion', label: 'AI Companion', icon: Sparkles, description: 'Chat with your timeline' },
-  { id: 'insights', label: 'Insights', icon: Compass, description: 'Patterns and analytics' },
-  { id: 'search', label: 'Search', icon: Search, description: 'Semantic search across events' },
+const NAV_ITEMS: { id: ViewName; labelKey: 'nav.timeline' | 'nav.calendar' | 'nav.unknown' | 'nav.companion' | 'nav.insights' | 'nav.search'; icon: typeof Clock }[] = [
+  { id: 'timeline', labelKey: 'nav.timeline', icon: LayoutList },
+  { id: 'calendar', labelKey: 'nav.calendar', icon: CalendarDays },
+  { id: 'unknown', labelKey: 'nav.unknown', icon: CircleHelp },
+  { id: 'companion', labelKey: 'nav.companion', icon: Sparkles },
+  { id: 'insights', labelKey: 'nav.insights', icon: Compass },
+  { id: 'search', labelKey: 'nav.search', icon: Search },
 ]
 
 export function AppSidebar() {
@@ -31,6 +32,7 @@ export function AppSidebar() {
   const notifPanelOpen = useAppStore((s) => s.notifPanelOpen)
   const { data: notifData } = useNotifications()
   const unread = notifData?.unreadCount ?? 0
+  const { t } = useTranslation()
 
   // Close sidebar on view change (mobile)
   useEffect(() => {
@@ -61,8 +63,8 @@ export function AppSidebar() {
               <Hourglass className="h-5 w-5" />
             </div>
             <div className="leading-tight">
-              <div className="text-sm font-semibold tracking-tight">Life Timeline</div>
-              <div className="text-[11px] text-muted-foreground">Never lose a moment</div>
+              <div className="text-sm font-semibold tracking-tight">{t('app.name')}</div>
+              <div className="text-[11px] text-muted-foreground">{t('app.tagline')}</div>
             </div>
           </div>
           <button
@@ -95,7 +97,7 @@ export function AppSidebar() {
                     )}
                   >
                     <Icon className={cn('h-4.5 w-4.5 shrink-0', active && 'text-emerald-600 dark:text-emerald-400')} />
-                    <span className="flex-1 text-left">{item.label}</span>
+                    <span className="flex-1 text-left">{t(item.labelKey)}</span>
                     {item.id === 'unknown' && <UnknownBadge />}
                     {active && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
                   </button>
@@ -111,7 +113,7 @@ export function AppSidebar() {
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground/70 hover:bg-accent hover:text-foreground"
           >
             <Bell className="h-4.5 w-4.5 shrink-0" />
-            <span className="flex-1 text-left">Notifications</span>
+            <span className="flex-1 text-left">{t('nav.notifications')}</span>
             {unread > 0 && (
               <span className="rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
                 {unread}
@@ -133,7 +135,7 @@ export function AppSidebar() {
               )}
             >
               <Settings className="h-3.5 w-3.5" />
-              Settings
+              {t('nav.settings')}
             </button>
           </div>
           <div className="rounded-lg bg-muted/50 p-3">

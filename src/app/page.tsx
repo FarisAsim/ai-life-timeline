@@ -12,12 +12,10 @@ import { InsightsView } from '@/components/insights/insights-view'
 import { SearchView } from '@/components/search/search-view'
 import { SettingsView } from '@/components/settings/settings-view'
 import { WelcomeDialog } from '@/components/onboarding/welcome-dialog'
-import { VoiceCaptureDialog } from '@/components/timeline/voice-capture-dialog'
 import { MobileBottomNav } from '@/components/layout/mobile-bottom-nav'
 import { useSettings } from '@/hooks/use-data'
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts'
-import { Sparkles, Mic } from 'lucide-react'
-import { useState } from 'react'
+import { Sparkles } from 'lucide-react'
 
 export default function Home() {
   const view = useAppStore((s) => s.view)
@@ -46,15 +44,12 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Floating voice capture button (always visible) */}
-      <VoiceFab />
-
-      {/* Floating companion quick-access button (visible on all views except companion itself) */}
+      {/* Floating companion quick-access button — desktop only */}
       {view !== 'companion' && <CompanionFab />}
 
       <NotificationsPanel />
 
-      {/* Mobile bottom navigation */}
+      {/* Mobile bottom navigation (includes voice capture button) */}
       <MobileBottomNav />
 
       {/* Onboarding welcome dialog (shows on first visit with no data) */}
@@ -88,27 +83,12 @@ function CompanionFab() {
   return (
     <button
       onClick={() => setView('companion')}
-      className="fixed bottom-16 right-4 z-20 flex items-center gap-2 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-600 px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-violet-500/30 transition-transform hover:scale-105 md:bottom-12 md:right-6"
+      className="fixed bottom-12 right-6 z-20 hidden items-center gap-2 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-600 px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-violet-500/30 transition-transform hover:scale-105 md:flex"
       aria-label="Open AI Companion"
     >
       <Sparkles className="h-4 w-4" />
-      <span className="hidden sm:inline">Ask AI</span>
+      <span>Ask AI</span>
     </button>
   )
 }
 
-function VoiceFab() {
-  const [open, setOpen] = useState(false)
-  return (
-    <>
-      <button
-        onClick={() => setOpen(true)}
-        className="fixed bottom-16 left-4 z-20 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30 transition-transform hover:scale-105 md:bottom-12 md:left-6"
-        aria-label="Voice capture"
-      >
-        <Mic className="h-5 w-5" />
-      </button>
-      <VoiceCaptureDialog open={open} onOpenChange={setOpen} />
-    </>
-  )
-}
