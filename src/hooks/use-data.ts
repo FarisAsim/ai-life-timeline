@@ -14,6 +14,46 @@ export function useCategories() {
   })
 }
 
+export function useCreateCategory() {
+  const qc = useQueryClient()
+  const triggerRefresh = useAppStore((s) => s.triggerRefresh)
+  return useMutation({
+    mutationFn: async (vars: { name: string; color: string; icon?: string }) => {
+      const r = await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(vars),
+      })
+      if (!r.ok) throw new Error('Failed to create category')
+      return r.json()
+    },
+    onSuccess: () => {
+      triggerRefresh()
+      qc.invalidateQueries({ queryKey: ['categories'] })
+    },
+  })
+}
+
+export function useDeleteCategory() {
+  const qc = useQueryClient()
+  const triggerRefresh = useAppStore((s) => s.triggerRefresh)
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const r = await fetch(`/api/categories/${id}`, { method: 'DELETE' })
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({ error: 'Delete failed' }))
+        throw new Error(err.error || 'Delete failed')
+      }
+      return r.json()
+    },
+    onSuccess: () => {
+      triggerRefresh()
+      qc.invalidateQueries({ queryKey: ['categories'] })
+      qc.invalidateQueries({ queryKey: ['timeline'] })
+    },
+  })
+}
+
 // ---------- Timeline events for selected day ----------
 export function useTimelineDay() {
   const date = useAppStore((s) => s.selectedDate)

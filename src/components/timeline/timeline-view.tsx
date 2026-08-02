@@ -7,6 +7,7 @@ import { useTimelineDay, useUnknownBlocks, useDetectGaps } from '@/hooks/use-dat
 import { EventCard } from './event-card'
 import { EventFormDialog } from './event-form-dialog'
 import { QuickAddButton } from './quick-add-button'
+import { TodayDashboard } from './today-dashboard'
 import { ResolutionDialog } from '@/components/unknown-blocks/resolution-dialog'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -68,6 +69,9 @@ export function TimelineView() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 px-4 py-5 md:px-6">
+      {/* Today dashboard — stats overview */}
+      <TodayDashboard />
+
       {/* Day summary hero */}
       <DaySummary
         date={day}

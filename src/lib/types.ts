@@ -36,6 +36,7 @@ export interface Attachment {
   mimeType: string
   size: number
   hasData: boolean
+  transcript: string | null
   createdAt: string
 }
 

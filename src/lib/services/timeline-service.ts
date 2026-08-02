@@ -27,6 +27,7 @@ function serialize(e: EventWithRelations, category: Category | null): TimelineEv
       mimeType: a.mimeType,
       size: a.size,
       hasData: true,
+      transcript: 'transcript' in a ? (a as { transcript?: string }).transcript ?? null : null,
       createdAt: a.createdAt.toISOString(),
     })),
     confidenceScore: e.confidenceScore,

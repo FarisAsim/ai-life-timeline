@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { useUploadAttachment } from '@/hooks/use-data'
-import { Mic, Square, Loader2, Play, Pause, X } from 'lucide-react'
+import { Mic, Square, Loader2, Play, Pause, X, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
@@ -122,8 +122,11 @@ export function VoiceNoteRecorder({ eventId, onDone }: VoiceNoteRecorderProps) {
 }
 
 // Audio player for existing voice note attachments
-export function VoiceNotePlayer({ attachmentId, filename, onDelete }: { attachmentId: string; filename: string; onDelete?: () => void }) {
+export function VoiceNotePlayer({ attachmentId, filename, transcript: initialTranscript, onDelete }: { attachmentId: string; filename: string; transcript?: string | null; onDelete?: () => void }) {
   const [playing, setPlaying] = useState(false)
+  const [transcript, setTranscript] = useState<string | null>(initialTranscript ?? null)
+  const [transcribing, setTranscribing] = useState(false)
+  const [showTranscript, setShowTranscript] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const toggle = () => {
@@ -136,30 +139,76 @@ export function VoiceNotePlayer({ attachmentId, filename, onDelete }: { attachme
     setPlaying(!playing)
   }
 
+  const transcribe = async () => {
+    setTranscribing(true)
+    try {
+      const r = await fetch(`/api/attachments/${attachmentId}/transcribe`, { method: 'POST' })
+      const j = await r.json()
+      if (j.transcript) {
+        setTranscript(j.transcript)
+        setShowTranscript(true)
+        toast.success('Transcript ready')
+      } else {
+        toast.error(j.error || 'Transcription failed')
+      }
+    } catch {
+      toast.error('Transcription failed')
+    } finally {
+      setTranscribing(false)
+    }
+  }
+
   return (
-    <div className="flex items-center gap-2 rounded-md border bg-card p-2">
-      <button
-        onClick={toggle}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-violet-600 hover:bg-violet-500/25"
-        aria-label={playing ? 'Pause' : 'Play'}
-      >
-        {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5 translate-x-0.5" />}
-      </button>
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-xs font-medium">{filename}</div>
-        <div className="text-[10px] text-muted-foreground">Voice note</div>
-      </div>
-      {onDelete && (
-        <button onClick={onDelete} className="text-rose-500 hover:text-rose-700" aria-label="Delete voice note">
-          <X className="h-3 w-3" />
+    <div className="rounded-md border bg-card p-2">
+      <div className="flex items-center gap-2">
+        <button
+          onClick={toggle}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-violet-600 hover:bg-violet-500/25"
+          aria-label={playing ? 'Pause' : 'Play'}
+        >
+          {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5 translate-x-0.5" />}
         </button>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-xs font-medium">{filename}</div>
+          <div className="text-[10px] text-muted-foreground">Voice note</div>
+        </div>
+        {transcript && (
+          <button
+            onClick={() => setShowTranscript((v) => !v)}
+            className="rounded px-1.5 py-0.5 text-[10px] font-medium text-violet-600 hover:bg-violet-500/10"
+            title="Toggle transcript"
+          >
+            {showTranscript ? 'Hide' : 'Transcript'}
+          </button>
+        )}
+        {!transcript && (
+          <button
+            onClick={transcribe}
+            disabled={transcribing}
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-violet-600 hover:bg-violet-500/10 disabled:opacity-50"
+            title="Transcribe with AI"
+          >
+            {transcribing ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Sparkles className="h-2.5 w-2.5" />}
+            {transcribing ? '…' : 'Transcribe'}
+          </button>
+        )}
+        {onDelete && (
+          <button onClick={onDelete} className="text-rose-500 hover:text-rose-700" aria-label="Delete voice note">
+            <X className="h-3 w-3" />
+          </button>
+        )}
+        <audio
+          ref={audioRef}
+          src={`/api/attachments/${attachmentId}`}
+          onEnded={() => setPlaying(false)}
+          className="hidden"
+        />
+      </div>
+      {showTranscript && transcript && (
+        <div className="mt-2 rounded border-l-2 border-violet-500/30 bg-violet-500/5 px-2 py-1.5 text-xs italic text-foreground/80">
+          &ldquo;{transcript}&rdquo;
+        </div>
       )}
-      <audio
-        ref={audioRef}
-        src={`/api/attachments/${attachmentId}`}
-        onEnded={() => setPlaying(false)}
-        className="hidden"
-      />
     </div>
   )
 }

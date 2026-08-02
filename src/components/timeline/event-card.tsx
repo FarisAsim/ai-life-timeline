@@ -215,6 +215,7 @@ export function EventCard({ event }: { event: TimelineEvent }) {
                               key={att.id}
                               attachmentId={att.id}
                               filename={att.filename}
+                              transcript={att.transcript}
                               onDelete={() => deleteAttMut.mutate(att.id, { onSuccess: () => toast.success('Voice note removed') })}
                             />
                           ))}

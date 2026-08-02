@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import type { ViewName } from '@/lib/types'
 import { useEffect, useState } from 'react'
+import { StreakBadge } from './streak-badge'
 
 const NAV_ITEMS: { id: ViewName; label: string; icon: typeof Clock; description: string }[] = [
   { id: 'timeline', label: 'Timeline', icon: LayoutList, description: 'Hour-by-hour record of your day' },
@@ -141,6 +142,9 @@ export function AppSidebar() {
             <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
               Your timeline is continuously scanned for gaps. Resolve them to train the AI.
             </p>
+          </div>
+          <div className="mt-2">
+            <StreakBadge />
           </div>
         </div>
       </aside>
