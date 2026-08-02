@@ -83,6 +83,7 @@ function EventFormBody({
   const [categoryId, setCategoryId] = useState<string>(existing?.categoryId ?? 'none')
   const [location, setLocation] = useState(existing?.location ?? '')
   const [notes, setNotes] = useState(existing?.notes ?? '')
+  const [tagsInput, setTagsInput] = useState(existing?.tags?.join(', ') ?? '')
 
   const pending = createMut.isPending || updateMut.isPending
 
@@ -109,6 +110,7 @@ function EventFormBody({
         endTime: endDate.toISOString(),
         location: location.trim() || undefined,
         notes: notes.trim() || undefined,
+        tags: tagsInput.split(',').map((t) => t.trim()).filter(Boolean),
         categoryId: categoryId === 'none' ? null : categoryId,
       }
       if (isEdit && existing) {
@@ -174,6 +176,16 @@ function EventFormBody({
         <div className="grid gap-2">
           <Label htmlFor="ev-notes">Notes (optional)</Label>
           <Textarea id="ev-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Private notes" />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="ev-tags">Tags (optional)</Label>
+          <Input
+            id="ev-tags"
+            value={tagsInput}
+            onChange={(e) => setTagsInput(e.target.value)}
+            placeholder="project-x, health, urgent"
+          />
+          <p className="text-[10px] text-muted-foreground">Comma-separated. Use tags to group events across categories.</p>
         </div>
       </div>
       <DialogFooter>

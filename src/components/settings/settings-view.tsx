@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
 import { CategoryManager } from './category-manager'
+import { TemplateManager } from './template-manager'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -120,6 +121,9 @@ function SettingsBody({ data }: { data: { user: { id: string; name: string | nul
 
       {/* Category management */}
       <CategoryManager />
+
+      {/* Template management */}
+      <TemplateManager />
 
       {/* Data stats */}
       <SectionCard icon={Database} title="Your data" description="What we've stored about your timeline">

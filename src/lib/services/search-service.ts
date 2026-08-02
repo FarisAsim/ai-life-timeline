@@ -41,7 +41,8 @@ export async function semanticSearch(userId: string, query: string, limit = 20):
   const keywords = q.split(/\s+/).filter((w) => w.length > 2)
   const preFiltered = events.filter((e) => {
     const voiceText = (e.attachments ?? []).map((a) => a.transcript ?? '').filter(Boolean).join(' ')
-    const hay = `${e.title} ${e.description ?? ''} ${e.notes ?? ''} ${e.location ?? ''} ${voiceText}`.toLowerCase()
+    const tags = e.tags ? e.tags.split(',').map((t) => `#${t.trim()}`).join(' ') : ''
+    const hay = `${e.title} ${e.description ?? ''} ${e.notes ?? ''} ${e.location ?? ''} ${voiceText} ${tags}`.toLowerCase()
     if (keywords.every((k) => hay.includes(k))) return true
     // also keep events whose category name matches
     const cat = e.categoryId ? catMap.get(e.categoryId) : null

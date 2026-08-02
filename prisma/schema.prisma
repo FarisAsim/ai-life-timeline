@@ -55,6 +55,7 @@ model TimelineEvent {
   durationMinutes Int
   location        String?
   notes           String?
+  tags            String?  // comma-separated tags e.g. "project-x,health,urgent"
   categoryId      String?
   confidenceScore Float    @default(1.0)
   source          String   @default("user_manual") // user_manual | ai_guess | ai_confirmed | integration

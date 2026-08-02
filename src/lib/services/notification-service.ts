@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { format } from 'date-fns'
 import { listOpenBlocks } from './gap-detection-service'
+import { listGoals } from './goal-service'
 
 export interface CreateNotificationInput {
   userId: string
@@ -104,6 +105,48 @@ export async function runNotificationEngine(userId: string) {
       actionPayload: { eventId: ev.id },
     })
     created.push(n)
+  }
+
+  // Goal achievement + at-risk notifications
+  const goals = await listGoals(userId)
+  for (const goal of goals) {
+    const pct = Math.round(goal.progress * 100)
+    const achieved = pct >= 100
+    const goalKey = `goal-${goal.id}`
+
+    // Achievement notification (only once per goal)
+    if (achieved) {
+      const existing = await db.notification.findFirst({
+        where: { userId, type: 'insight', actionPayload: { contains: goalKey }, body: { contains: 'achieved' } },
+      })
+      if (!existing) {
+        const n = await createNotification({
+          userId,
+          type: 'insight',
+          title: `🎉 Goal achieved!`,
+          body: `You hit "${goal.title}" — ${goal.currentValue.toFixed(1)} / ${goal.targetValue} this ${goal.period}. Keep it up!`,
+          actionType: 'view_insight',
+          actionPayload: { goalId: goal.id, goalKey },
+        })
+        created.push(n)
+      }
+    } else if (pct >= 75 && goal.period === 'weekly') {
+      // Near-achievement nudge (75%+ on weekly goals)
+      const existing = await db.notification.findFirst({
+        where: { userId, type: 'insight', actionPayload: { contains: goalKey }, body: { contains: 'almost there' } },
+      })
+      if (!existing) {
+        const n = await createNotification({
+          userId,
+          type: 'insight',
+          title: `Almost there: ${goal.title}`,
+          body: `You're at ${pct}% of your weekly goal (${goal.currentValue.toFixed(1)} / ${goal.targetValue}). One more push!`,
+          actionType: 'view_insight',
+          actionPayload: { goalId: goal.id, goalKey },
+        })
+        created.push(n)
+      }
+    }
   }
 
   return created

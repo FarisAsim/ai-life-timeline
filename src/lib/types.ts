@@ -50,6 +50,7 @@ export interface TimelineEvent {
   durationMinutes: number
   location: string | null
   notes: string | null
+  tags: string[] // parsed from comma-separated
   categoryId: string | null
   category: Category | null
   attachments: Attachment[]

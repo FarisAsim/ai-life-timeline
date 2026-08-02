@@ -17,6 +17,7 @@ function serialize(e: EventWithRelations, category: Category | null): TimelineEv
     durationMinutes: e.durationMinutes,
     location: e.location,
     notes: e.notes,
+    tags: e.tags ? e.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
     categoryId: e.categoryId,
     category,
     attachments: (e.attachments ?? []).map((a) => ({
@@ -94,6 +95,7 @@ export interface CreateEventInput {
   endTime: string
   location?: string
   notes?: string
+  tags?: string[]
   categoryId?: string | null
   confidenceScore?: number
   source?: EventSource
@@ -113,6 +115,7 @@ export async function createEvent(userId: string, input: CreateEventInput): Prom
       durationMinutes: duration,
       location: input.location ?? null,
       notes: input.notes ?? null,
+      tags: input.tags && input.tags.length > 0 ? input.tags.join(',') : null,
       categoryId: input.categoryId ?? null,
       confidenceScore: input.confidenceScore ?? 1.0,
       source: input.source ?? 'user_manual',
@@ -139,6 +142,7 @@ export async function updateEvent(userId: string, eventId: string, input: Partia
       durationMinutes: duration,
       location: input.location ?? existing.location,
       notes: input.notes ?? existing.notes,
+      tags: input.tags !== undefined ? (input.tags.length > 0 ? input.tags.join(',') : null) : existing.tags,
       categoryId: input.categoryId !== undefined ? input.categoryId : existing.categoryId,
       confidenceScore: input.confidenceScore ?? existing.confidenceScore,
       source: input.source ?? existing.source,

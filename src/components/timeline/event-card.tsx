@@ -135,6 +135,15 @@ export function EventCard({ event }: { event: TimelineEvent }) {
                       {event.category?.name ?? 'Uncategorized'}
                     </span>
                   </div>
+                  {event.tags.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {event.tags.map((tag) => (
+                        <span key={tag} className="rounded bg-teal-500/10 px-1.5 py-0 text-[9px] font-medium text-teal-700 dark:text-teal-300">
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex shrink-0 items-center gap-1">

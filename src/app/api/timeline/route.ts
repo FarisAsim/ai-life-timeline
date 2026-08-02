@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
     endTime: body.endTime,
     location: body.location,
     notes: body.notes,
+    tags: body.tags,
     categoryId: body.categoryId ?? null,
     confidenceScore: body.confidenceScore,
     source: body.source,
