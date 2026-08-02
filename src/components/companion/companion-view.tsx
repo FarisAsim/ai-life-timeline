@@ -97,7 +97,22 @@ export function CompanionView() {
         }
         setMessages((m) => [...m, actionNote])
         if (result.actionResult.executed) {
-          toast.success(result.actionResult.detail)
+          // Show undo toast for create_event / resolve_gap actions
+          if (result.actionResult.eventId && (result.action?.type === 'create_event' || result.action?.type === 'resolve_gap')) {
+            toast.success(result.actionResult.detail, {
+              duration: 6000,
+              action: {
+                label: 'Undo',
+                onClick: () => {
+                  fetch(`/api/timeline/${result.actionResult!.eventId}`, { method: 'DELETE' })
+                    .then(() => toast.success('Event removed'))
+                    .catch(() => toast.error('Could not undo'))
+                },
+              },
+            })
+          } else {
+            toast.success(result.actionResult.detail)
+          }
         }
       } else if (result.action && result.action.type !== 'answer') {
         // Fallback for actions that didn't execute

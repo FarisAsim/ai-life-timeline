@@ -13,13 +13,15 @@ import { InsightsView } from '@/components/insights/insights-view'
 import { SearchView } from '@/components/search/search-view'
 import { SettingsView } from '@/components/settings/settings-view'
 import { useSeed } from '@/hooks/use-data'
+import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts'
 import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
 import { Sparkles } from 'lucide-react'
 
 export default function Home() {
   const view = useAppStore((s) => s.view)
   const seed = useSeed()
+
+  useKeyboardShortcuts()
 
   // Auto-seed demo data on first load so the app is immediately useful
   useEffect(() => {
@@ -63,7 +65,16 @@ export default function Home() {
             <Sparkles className="h-3 w-3 text-emerald-500" />
             AI Life Timeline — Never lose a moment
           </span>
-          <span className="hidden sm:inline">Hour-by-hour · Gap detection · Habit learning</span>
+          <span className="hidden items-center gap-3 sm:flex">
+            <kbd className="rounded border bg-muted px-1 py-0.5 text-[9px] font-semibold">T</kbd>
+            <kbd className="rounded border bg-muted px-1 py-0.5 text-[9px] font-semibold">K</kbd>
+            <kbd className="rounded border bg-muted px-1 py-0.5 text-[9px] font-semibold">U</kbd>
+            <kbd className="rounded border bg-muted px-1 py-0.5 text-[9px] font-semibold">C</kbd>
+            <kbd className="rounded border bg-muted px-1 py-0.5 text-[9px] font-semibold">I</kbd>
+            <kbd className="rounded border bg-muted px-1 py-0.5 text-[9px] font-semibold">/</kbd>
+            <kbd className="rounded border bg-muted px-1 py-0.5 text-[9px] font-semibold">N</kbd>
+            <span className="ml-1">navigate</span>
+          </span>
         </div>
       </footer>
     </div>
@@ -83,5 +94,3 @@ function CompanionFab() {
     </button>
   )
 }
-
-void Button

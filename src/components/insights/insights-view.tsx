@@ -226,25 +226,47 @@ export function InsightsView() {
           <span className="text-[11px] text-muted-foreground">— your habit model, trained from confirmed events</span>
         </div>
         {data.topHabits.length === 0 ? (
-          <p className="py-6 text-center text-xs text-muted-foreground">
-            No habits learned yet. Resolve a few Unknown Blocks and the AI will start recognizing your patterns.
-          </p>
+          <div className="flex flex-col items-center gap-2 py-8 text-center">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-500/10">
+              <Sparkles className="h-5 w-5 text-violet-500" />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              No habits learned yet. Resolve a few Unknown Blocks and the AI will start recognizing your patterns.
+            </p>
+          </div>
         ) : (
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="space-y-2">
             {data.topHabits.map((h, i) => {
-              const cat = h.categoryId
+              const confPct = Math.round(h.confidence * 100)
+              const confColor = confPct >= 70 ? 'bg-emerald-500' : confPct >= 40 ? 'bg-amber-500' : 'bg-slate-400'
+              const label = h.patternKey.replace(/_/g, ' ')
+              const isTime = ['morning', 'afternoon', 'evening', 'night'].includes(h.patternKey)
+              const icon = isTime ? '🕐' : ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'].includes(h.patternKey) ? '📅' : '✨'
               return (
                 <div key={i} className="flex items-center gap-3 rounded-lg border bg-card p-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600">
-                    <Sparkles className="h-4 w-4" />
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-lg">
+                    {icon}
                   </div>
-                  <div className="flex-1">
-                    <div className="text-xs font-semibold capitalize">{h.patternKey.replace(/_/g, ' ')}</div>
-                    <div className="text-[11px] text-muted-foreground">{h.frequency} occurrences · {Math.round(h.confidence * 100)}% confidence</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold capitalize">{label}</span>
+                      <span className="text-[10px] font-medium text-muted-foreground">{h.frequency}× seen</span>
+                    </div>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                        <div className={`h-full rounded-full ${confColor} transition-all`} style={{ width: `${confPct}%` }} />
+                      </div>
+                      <span className={`text-[10px] font-semibold ${confPct >= 70 ? 'text-emerald-600' : confPct >= 40 ? 'text-amber-600' : 'text-slate-500'}`}>
+                        {confPct}%
+                      </span>
+                    </div>
                   </div>
                 </div>
               )
             })}
+            <p className="pt-1 text-center text-[10px] text-muted-foreground">
+              Higher confidence = the AI is more likely to suggest this pattern when filling future gaps.
+            </p>
           </div>
         )}
       </Card>

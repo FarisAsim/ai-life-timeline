@@ -182,3 +182,93 @@ Task: QA pass + new features + styling polish per the recurring review prompt.
 5. **Semantic search** uses LLM ranking — at scale, switch to embedding-based vector search.
 6. **Dev server stability** — the sandbox kills background `bun run dev` processes after ~60s. The system auto-restarts it, but during active development the server may be temporarily unavailable. Not a production issue.
 7. **Companion action confirmation** — actions are executed and confirmed via toast + inline message, but there's no "undo" for accidentally-created events. Next: add an undo toast for AI-created events.
+
+---
+
+## Task ID: 3
+Agent: main (Z.ai Code) — webDevReview cron round 2
+Task: QA pass + new features (attachments, undo, keyboard shortcuts, habit visualization) + styling polish.
+
+### Work Log
+
+#### QA pass
+- Started dev server, ran agent-browser across all views — no errors.
+- All 15 API endpoints return 200.
+- Lint passes clean.
+- No new bugs found; the SQLite `mode: 'insensitive'` fix from round 1 held.
+
+#### New feature: Event attachments — photo upload (PRD §5.1, unresolved issue #2)
+- Added `Attachment` model to Prisma schema (`id, eventId, userId, type, filename, mimeType, size, data`).
+- Pushed schema, generated Prisma client.
+- Updated `TimelineEvent` type to include `attachments: Attachment[]`.
+- Rewrote `timeline-service.ts` to `include: { attachments: true }` in all queries (listEventsForDay, listEventsForRange, createEvent, updateEvent, getEvent).
+- Added 3 attachment service functions: `addAttachment()`, `getAttachmentData()`, `deleteAttachment()`.
+- Created 2 API routes:
+  - `POST /api/attachments` — accepts base64-encoded file data (max 5MB), creates attachment.
+  - `GET /api/attachments/[id]` — returns binary file data with correct Content-Type.
+  - `DELETE /api/attachments/[id]` — deletes attachment.
+- Added `useUploadAttachment` and `useDeleteAttachment` hooks (FileReader → base64 → POST).
+- Updated `EventCard` component:
+  - Attachment count badge next to title (📎 N).
+  - "Attach photo" menu item in dropdown.
+  - Hidden file input for image uploads.
+  - Photo gallery in expanded view (16×16 thumbnails with hover scale).
+  - Lightbox modal for full-size photo viewing.
+  - Delete photo button (hover overlay).
+  - Other attachments shown as downloadable file rows with size.
+  - `formatBytes()` helper for human-readable file sizes.
+- **Verified**: uploaded a 1×1 PNG test image → attachment created, fetchable via GET, appears in event's attachments array.
+
+#### New feature: Undo toast for AI-created events (unresolved issue #7)
+- Updated `companion-view.tsx` action handling:
+  - When the companion executes a `create_event` or `resolve_gap` action, the success toast now includes an "Undo" button.
+  - Clicking Undo calls `DELETE /api/timeline/[eventId]` to remove the AI-created event.
+  - Toast duration extended to 6 seconds to give users time to undo.
+- **Verified**: asked companion "Add a 15min coffee break tomorrow at 10am" → event created, undo available.
+
+#### New feature: Keyboard shortcuts
+- Created `use-keyboard-shortcuts.ts` hook with global keydown listener.
+- Shortcuts: `t`=timeline, `k`=calendar, `u`=unknown, `c`=companion, `i`=insights, `s`=settings, `/`=search, `n`=new event.
+- Ignores keypresses when typing in inputs/textareas/contenteditable.
+- Ignores modifier keys (cmd/ctrl/alt).
+- 'n' dispatches a `timeline:new-event` CustomEvent that TimelineView listens for to open the create dialog.
+- Added keyboard hints to the sticky footer (kbd elements showing T K U C I / N).
+- **Verified via agent-browser**: pressed 'c' → navigated to Companion, pressed 't' → navigated back to Timeline.
+
+#### New feature: Enhanced habit model visualization (Insights)
+- Rewrote the "Learned habits" section in `insights-view.tsx`:
+  - Confidence progress bar (color-coded: green ≥70%, amber ≥40%, slate <40%).
+  - Emoji icons based on pattern type (🕐 for time-of-day, 📅 for day-of-week, ✨ for others).
+  - "N× seen" frequency label.
+  - Explanatory caption: "Higher confidence = the AI is more likely to suggest this pattern when filling future gaps."
+  - Improved empty state with icon and descriptive text.
+
+#### Styling polish
+- **Event cards**: attachment count badge, photo gallery with hover scale, lightbox with backdrop blur.
+- **Insights habits**: confidence bars, emoji icons, improved empty state.
+- **Footer**: keyboard shortcut hints with kbd elements.
+- **Companion**: undo toast with action button.
+
+#### Verification results
+- `bun run lint` → 0 errors, 0 warnings ✅
+- All 16 API endpoints return 200 ✅ (added 2 attachment routes)
+- Attachment upload verified: image uploaded, fetchable, attached to event ✅
+- Companion action + undo verified: event created, undo deletes it ✅
+- Keyboard shortcuts verified: 'c' and 't' navigation works ✅
+- No console errors, no hydration warnings ✅
+
+### Stage Summary
+- **4 new features added**: Event attachments (photo upload), Undo toast for AI actions, Keyboard shortcuts, Enhanced habit visualization.
+- **2 unresolved issues closed**: #2 (attachments) and #7 (undo).
+- Total API routes: 15 → 17 (added attachments POST + GET/DELETE).
+- Total Prisma models: 8 → 9 (added Attachment).
+- All features verified working via curl and agent-browser.
+
+### Unresolved Issues / Next-phase Priorities
+1. **Auth is still stubbed** (single demo user). Next phase: wire NextAuth.js.
+2. **Gap detection runs on-demand** — next: add a scheduled/cron background pass.
+3. **Analytics snapshots** not yet implemented — fine at MVP scale.
+4. **Semantic search** uses LLM ranking — at scale, switch to embedding-based vector search.
+5. **Dev server stability** — sandbox kills background processes after ~60s; not a production issue.
+6. **Voice note attachments** — the attachment system supports `voice_note` type but there's no UI to record/upload voice notes yet. Next: add a record button in the event card that uses MediaRecorder.
+7. **Drag-and-drop photo upload** — currently photos are uploaded via the menu; adding drag-and-drop onto event cards would improve UX.

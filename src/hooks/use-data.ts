@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAppStore } from '@/stores/app-store'
-import type { Category, CreateEventInput, TimelineEvent } from '@/lib/types'
+import type { Category, CreateEventInput, TimelineEvent, Attachment } from '@/lib/types'
 
 // ---------- Categories ----------
 export function useCategories() {
@@ -373,4 +373,59 @@ export function useDeleteAccount() {
       qc.invalidateQueries()
     },
   })
+}
+
+// ---------- Attachments ----------
+export function useUploadAttachment() {
+  const qc = useQueryClient()
+  const triggerRefresh = useAppStore((s) => s.triggerRefresh)
+  return useMutation({
+    mutationFn: async (vars: { eventId: string; file: File }) => {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onloadend = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(vars.file)
+      })
+      const r = await fetch('/api/attachments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId: vars.eventId,
+          filename: vars.file.name,
+          mimeType: vars.file.type,
+          data: dataUrl,
+        }),
+      })
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({ error: 'Upload failed' }))
+        throw new Error(err.error || 'Upload failed')
+      }
+      return r.json()
+    },
+    onSuccess: () => {
+      triggerRefresh()
+      qc.invalidateQueries({ queryKey: ['timeline'] })
+    },
+  })
+}
+
+export function useDeleteAttachment() {
+  const qc = useQueryClient()
+  const triggerRefresh = useAppStore((s) => s.triggerRefresh)
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const r = await fetch(`/api/attachments/${id}`, { method: 'DELETE' })
+      if (!r.ok) throw new Error('Delete failed')
+      return r.json()
+    },
+    onSuccess: () => {
+      triggerRefresh()
+      qc.invalidateQueries({ queryKey: ['timeline'] })
+    },
+  })
+}
+
+export function attachmentUrl(id: string) {
+  return `/api/attachments/${id}`
 }

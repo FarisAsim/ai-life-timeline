@@ -1,8 +1,12 @@
 import { db } from '@/lib/db'
 import { differenceInMinutes } from 'date-fns'
-import type { TimelineEvent, Category, EventSource } from '@/lib/types'
+import type { TimelineEvent, Category, EventSource, Attachment } from '@/lib/types'
 
-function serialize(e: Awaited<ReturnType<typeof db.timelineEvent.findFirst>> & object, category: Category | null): TimelineEvent {
+type EventWithRelations = Awaited<ReturnType<typeof db.timelineEvent.findFirst>> & {
+  attachments?: { id: string; eventId: string; type: string; filename: string; mimeType: string; size: number; createdAt: Date }[]
+}
+
+function serialize(e: EventWithRelations, category: Category | null): TimelineEvent {
   return {
     id: e.id,
     userId: e.userId,
@@ -15,11 +19,28 @@ function serialize(e: Awaited<ReturnType<typeof db.timelineEvent.findFirst>> & o
     notes: e.notes,
     categoryId: e.categoryId,
     category,
+    attachments: (e.attachments ?? []).map((a) => ({
+      id: a.id,
+      eventId: a.eventId,
+      type: a.type as Attachment['type'],
+      filename: a.filename,
+      mimeType: a.mimeType,
+      size: a.size,
+      hasData: true,
+      createdAt: a.createdAt.toISOString(),
+    })),
     confidenceScore: e.confidenceScore,
     source: e.source as EventSource,
     createdAt: e.createdAt.toISOString(),
     updatedAt: e.updatedAt.toISOString(),
   }
+}
+
+async function getCatMap(userId: string): Promise<Map<string, Category>> {
+  const cats = await db.category.findMany({ where: { userId } })
+  const m = new Map<string, Category>()
+  cats.forEach((c) => m.set(c.id, { ...c, icon: c.icon }))
+  return m
 }
 
 export async function listEventsForDay(userId: string, dateISO: string): Promise<TimelineEvent[]> {
@@ -38,13 +59,11 @@ export async function listEventsForDay(userId: string, dateISO: string): Promise
         { AND: [{ startTime: { lte: start } }, { endTime: { gte: end } }] },
       ],
     },
+    include: { attachments: { orderBy: { createdAt: 'asc' } } },
     orderBy: { startTime: 'asc' },
   })
 
-  const catMap = new Map<string, Category>()
-  const cats = await db.category.findMany({ where: { userId } })
-  cats.forEach((c) => catMap.set(c.id, { ...c, icon: c.icon }))
-
+  const catMap = await getCatMap(userId)
   return events.map((e) => serialize(e, e.categoryId ? catMap.get(e.categoryId) ?? null : null))
 }
 
@@ -60,11 +79,10 @@ export async function listEventsForRange(userId: string, startISO: string, endIS
         { AND: [{ startTime: { lte: start } }, { endTime: { gte: end } }] },
       ],
     },
+    include: { attachments: true },
     orderBy: { startTime: 'asc' },
   })
-  const catMap = new Map<string, Category>()
-  const cats = await db.category.findMany({ where: { userId } })
-  cats.forEach((c) => catMap.set(c.id, { ...c, icon: c.icon }))
+  const catMap = await getCatMap(userId)
   return events.map((e) => serialize(e, e.categoryId ? catMap.get(e.categoryId) ?? null : null))
 }
 
@@ -98,6 +116,7 @@ export async function createEvent(userId: string, input: CreateEventInput): Prom
       confidenceScore: input.confidenceScore ?? 1.0,
       source: input.source ?? 'user_manual',
     },
+    include: { attachments: true },
   })
   const cat = created.categoryId ? await db.category.findUnique({ where: { id: created.categoryId } }) : null
   return serialize(created, cat ? { ...cat, icon: cat.icon } : null)
@@ -123,6 +142,7 @@ export async function updateEvent(userId: string, eventId: string, input: Partia
       confidenceScore: input.confidenceScore ?? existing.confidenceScore,
       source: input.source ?? existing.source,
     },
+    include: { attachments: true },
   })
   const cat = updated.categoryId ? await db.category.findUnique({ where: { id: updated.categoryId } }) : null
   return serialize(updated, cat ? { ...cat, icon: cat.icon } : null)
@@ -136,8 +156,42 @@ export async function deleteEvent(userId: string, eventId: string): Promise<bool
 }
 
 export async function getEvent(userId: string, eventId: string): Promise<TimelineEvent | null> {
-  const e = await db.timelineEvent.findFirst({ where: { id: eventId, userId } })
+  const e = await db.timelineEvent.findFirst({ where: { id: eventId, userId }, include: { attachments: true } })
   if (!e) return null
   const cat = e.categoryId ? await db.category.findUnique({ where: { id: e.categoryId } }) : null
   return serialize(e, cat ? { ...cat, icon: cat.icon } : null)
+}
+
+// ---------- Attachments ----------
+
+export async function addAttachment(userId: string, eventId: string, file: { filename: string; mimeType: string; size: number; data: string }) {
+  // Verify ownership
+  const event = await db.timelineEvent.findFirst({ where: { id: eventId, userId } })
+  if (!event) return null
+  const type: string = file.mimeType.startsWith('image/') ? 'photo' : file.mimeType.startsWith('audio/') ? 'voice_note' : 'file'
+  const att = await db.attachment.create({
+    data: {
+      eventId,
+      userId,
+      type,
+      filename: file.filename,
+      mimeType: file.mimeType,
+      size: file.size,
+      data: file.data,
+    },
+  })
+  return { id: att.id, type: att.type, filename: att.filename, mimeType: att.mimeType, size: att.size, eventId: att.eventId, hasData: true, createdAt: att.createdAt.toISOString() }
+}
+
+export async function getAttachmentData(userId: string, attachmentId: string) {
+  const att = await db.attachment.findFirst({ where: { id: attachmentId, userId } })
+  if (!att) return null
+  return { data: att.data, mimeType: att.mimeType, filename: att.filename }
+}
+
+export async function deleteAttachment(userId: string, attachmentId: string) {
+  const att = await db.attachment.findFirst({ where: { id: attachmentId, userId } })
+  if (!att) return false
+  await db.attachment.delete({ where: { id: attachmentId } })
+  return true
 }

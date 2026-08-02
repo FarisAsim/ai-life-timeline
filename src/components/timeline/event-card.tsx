@@ -1,18 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
 import { EventFormDialog, formatTimeRange } from './event-form-dialog'
-import { useDeleteEvent } from '@/hooks/use-data'
+import { useDeleteEvent, useUploadAttachment, useDeleteAttachment, attachmentUrl } from '@/hooks/use-data'
 import type { TimelineEvent } from '@/lib/types'
 import { CATEGORY_COLOR_MAP, SOURCE_LABELS } from '@/lib/types'
 import { format } from 'date-fns'
 import {
-  MoreVertical, Pencil, Trash2, MapPin, Clock, AlignLeft, StickyNote, ChevronDown, ChevronRight, Sparkles, Bot,
+  MoreVertical, Pencil, Trash2, MapPin, Clock, AlignLeft, StickyNote, ChevronDown, Sparkles, Bot, Paperclip, Image as ImageIcon, FileText, X, Loader2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -20,12 +20,18 @@ import { cn } from '@/lib/utils'
 export function EventCard({ event }: { event: TimelineEvent }) {
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
+  const [lightbox, setLightbox] = useState<string | null>(null)
   const deleteMut = useDeleteEvent()
+  const uploadMut = useUploadAttachment()
+  const deleteAttMut = useDeleteAttachment()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const color = event.category ? (CATEGORY_COLOR_MAP[event.category.color] ?? CATEGORY_COLOR_MAP.slate) : null
   const start = new Date(event.startTime)
   const isAiSource = event.source === 'ai_guess' || event.source === 'ai_confirmed'
-  const hasExtras = !!(event.description || event.notes || event.location)
+  const hasExtras = !!(event.description || event.notes || event.location || event.attachments.length > 0)
+  const photoAttachments = event.attachments.filter((a) => a.type === 'photo')
+  const otherAttachments = event.attachments.filter((a) => a.type !== 'photo')
 
   const handleDelete = () => {
     deleteMut.mutate(event.id, {
@@ -68,6 +74,12 @@ export function EventCard({ event }: { event: TimelineEvent }) {
                       <Badge variant="outline" className="gap-1 border-violet-500/30 bg-violet-500/10 px-1.5 py-0 text-[10px] font-medium text-violet-700 dark:text-violet-300">
                         {event.source === 'ai_confirmed' ? <Sparkles className="h-2.5 w-2.5" /> : <Bot className="h-2.5 w-2.5" />}
                         {SOURCE_LABELS[event.source]}
+                      </Badge>
+                    )}
+                    {event.attachments.length > 0 && (
+                      <Badge variant="outline" className="gap-1 border-slate-400/30 bg-slate-400/10 px-1.5 py-0 text-[10px] font-medium text-slate-600 dark:text-slate-300">
+                        <Paperclip className="h-2.5 w-2.5" />
+                        {event.attachments.length}
                       </Badge>
                     )}
                   </div>
@@ -120,6 +132,9 @@ export function EventCard({ event }: { event: TimelineEvent }) {
                       <DropdownMenuItem onClick={() => setExpanded((v) => !v)}>
                         <AlignLeft className="mr-2 h-3.5 w-3.5" /> {expanded ? 'Hide details' : 'Show details'}
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
+                        <Paperclip className="mr-2 h-3.5 w-3.5" /> Attach photo
+                      </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem className="text-rose-600 focus:text-rose-600" onClick={handleDelete}>
                         <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
@@ -138,7 +153,7 @@ export function EventCard({ event }: { event: TimelineEvent }) {
                     transition={{ duration: 0.2, ease: 'easeInOut' }}
                     className="overflow-hidden"
                   >
-                    <div className="mt-2 space-y-1.5 border-t pt-2 text-xs">
+                    <div className="mt-2 space-y-2 border-t pt-2 text-xs">
                       {event.description && (
                         <div className="flex gap-1.5">
                           <AlignLeft className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />
@@ -149,6 +164,49 @@ export function EventCard({ event }: { event: TimelineEvent }) {
                         <div className="flex gap-1.5">
                           <StickyNote className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />
                           <span className="italic text-muted-foreground">{event.notes}</span>
+                        </div>
+                      )}
+                      {/* Photo gallery */}
+                      {photoAttachments.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {photoAttachments.map((att) => (
+                            <div key={att.id} className="group/photo relative">
+                              <img
+                                src={attachmentUrl(att.id)}
+                                alt={att.filename}
+                                className="h-16 w-16 cursor-pointer rounded-md border object-cover transition-transform hover:scale-105"
+                                onClick={() => setLightbox(attachmentUrl(att.id))}
+                              />
+                              <button
+                                onClick={() => deleteAttMut.mutate(att.id, { onSuccess: () => toast.success('Photo removed') })}
+                                className="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-white group-hover/photo:flex"
+                                aria-label="Delete photo"
+                              >
+                                <X className="h-2.5 w-2.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {/* Other attachments */}
+                      {otherAttachments.length > 0 && (
+                        <div className="space-y-1">
+                          {otherAttachments.map((att) => (
+                            <div key={att.id} className="flex items-center gap-2 rounded-md border p-1.5">
+                              <FileText className="h-3 w-3 shrink-0 text-muted-foreground" />
+                              <a href={attachmentUrl(att.id)} download={att.filename} className="flex-1 truncate text-foreground/80 hover:underline">
+                                {att.filename}
+                              </a>
+                              <span className="text-[10px] text-muted-foreground">{formatBytes(att.size)}</span>
+                              <button
+                                onClick={() => deleteAttMut.mutate(att.id, { onSuccess: () => toast.success('Attachment removed') })}
+                                className="text-rose-500 hover:text-rose-700"
+                                aria-label="Delete attachment"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ))}
                         </div>
                       )}
                       <div className="flex items-center gap-3 pt-1 text-[10px] text-muted-foreground">
@@ -168,6 +226,46 @@ export function EventCard({ event }: { event: TimelineEvent }) {
           </div>
         </Card>
       </motion.div>
+
+      {/* Hidden file input for uploads */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (!file) return
+          if (!file.type.startsWith('image/')) {
+            toast.error('Only image files are supported')
+            return
+          }
+          uploadMut.mutate(
+            { eventId: event.id, file },
+            {
+              onSuccess: () => {
+                toast.success('Photo attached')
+                setExpanded(true)
+              },
+              onError: (err) => toast.error(err.message),
+            },
+          )
+          e.target.value = ''
+        }}
+      />
+
+      {/* Lightbox */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          onClick={() => setLightbox(null)}
+        >
+          <img src={lightbox} alt="Attachment" className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain shadow-2xl" />
+          <button className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20" aria-label="Close">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+      )}
 
       {editing && <EventFormDialog open={editing} onOpenChange={setEditing} existing={event} />}
     </>
@@ -197,3 +295,12 @@ function formatDuration(minutes: number): string {
   if (m === 0) return `${h}h`
   return `${h}h ${m}m`
 }
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+void ImageIcon
+void Loader2

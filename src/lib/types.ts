@@ -28,6 +28,17 @@ export interface Category {
   isDefault: boolean
 }
 
+export interface Attachment {
+  id: string
+  eventId: string
+  type: 'photo' | 'voice_note' | 'file'
+  filename: string
+  mimeType: string
+  size: number
+  hasData: boolean
+  createdAt: string
+}
+
 export interface TimelineEvent {
   id: string
   userId: string
@@ -40,6 +51,7 @@ export interface TimelineEvent {
   notes: string | null
   categoryId: string | null
   category: Category | null
+  attachments: Attachment[]
   confidenceScore: number
   source: EventSource
   createdAt: string

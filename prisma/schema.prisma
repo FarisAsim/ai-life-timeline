@@ -61,10 +61,28 @@ model TimelineEvent {
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   category      Category?      @relation(fields: [categoryId], references: [id])
   resolvedBlock UnknownBlock?
+  attachments   Attachment[]
 
   @@index([userId, startTime, endTime])
   @@index([userId, categoryId])
   @@index([userId, source])
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  eventId   String
+  userId    String
+  type      String   // photo | voice_note | file
+  filename  String
+  mimeType  String
+  size      Int
+  data      String   // base64-encoded for MVP (no object storage in sandbox)
+  createdAt DateTime @default(now())
+
+  event TimelineEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([userId])
 }
 
 model UnknownBlock {

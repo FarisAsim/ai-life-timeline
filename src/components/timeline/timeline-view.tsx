@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAppStore } from '@/stores/app-store'
 import { useTimelineDay, useUnknownBlocks, useDetectGaps } from '@/hooks/use-data'
@@ -27,8 +27,14 @@ export function TimelineView() {
   const { data: blocks, isLoading: blocksLoading } = useUnknownBlocks()
   const detectGaps = useDetectGaps()
 
+  // Listen for the 'timeline:new-event' CustomEvent (dispatched by the 'n' keyboard shortcut)
   const [creating, setCreating] = useState(false)
   const [resolving, setResolving] = useState<UnknownBlock | null>(null)
+  useEffect(() => {
+    const handler = () => setCreating(true)
+    window.addEventListener('timeline:new-event', handler)
+    return () => window.removeEventListener('timeline:new-event', handler)
+  }, [])
 
   // Interleave events and gaps by start time
   const rows = useMemo<Row[]>(() => {
