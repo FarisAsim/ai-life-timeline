@@ -44,7 +44,7 @@
 }
 
 :root {
-  --radius: 0.625rem;
+  --radius: 0.75rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -118,37 +118,69 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Mobile: prevent text size adjust */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    /* Safe area insets */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Enforce 16px minimum font on all inputs to prevent iOS zoom */
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+
+  /* Smooth touch scrolling */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Better tap highlight */
+  button, a, [role="button"] {
+    -webkit-tap-highlight-color: transparent;
   }
 }
 
-/* RTL support for Egyptian Arabic */
+/* ===== MOBILE-FIRST UTILITY CLASSES ===== */
+
+/* Minimum touch target: 44x44px per WCAG 2.1 */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* RTL support */
 html[dir="rtl"] {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-html[dir="rtl"] .ltr-only {
-  display: none;
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
-/* Mobile: prevent text size adjust */
-html {
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
+/* Mobile: hide scrollbar for cleaner look */
+@media (max-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
 }
 
-/* Safe area for mobile */
-body {
-  padding-top: env(safe-area-inset-top);
+/* Desktop: show scrollbar */
+@media (min-width: 769px) {
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 3px;
+  }
 }
-
-/* Smooth scrolling for mobile */
-main {
-  -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
-}
-
-/* Prevent zoom on input focus (iOS) */
-input, textarea, select {
-  font-size: 16px;
-}
-

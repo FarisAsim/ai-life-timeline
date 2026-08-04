@@ -180,26 +180,26 @@ function DaySummary({
 
   return (
     <Card className="overflow-hidden border-0 bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent">
-      <div className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between md:p-5">
         <div className="flex items-start gap-3">
-          <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-background/80 text-center shadow-sm">
-            <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">{format(date, 'MMM')}</span>
-            <span className="text-lg font-bold leading-none">{format(date, 'd')}</span>
+          <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-background/80 text-center shadow-sm">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{format(date, 'MMM')}</span>
+            <span className="text-xl font-bold leading-none">{format(date, 'd')}</span>
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-base font-semibold">
+              <h2 className="text-lg font-bold">
                 {today ? 'Today' : format(date, 'EEEE')}
               </h2>
-              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white ${statusColor}`}>
+              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold text-white ${statusColor}`}>
                 <span className="h-1.5 w-1.5 rounded-full bg-white/90" />
                 {status === 'green' ? 'Complete' : status === 'yellow' ? 'Partial' : 'Incomplete'}
               </span>
             </div>
-            <p className="mt-0.5 text-xs text-muted-foreground">
+            <p className="mt-1 text-sm text-muted-foreground">
               {eventCount} event{eventCount === 1 ? '' : 's'} · {hours}h tracked · {completion}% of waking hours
             </p>
-            <div className="mt-2 h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-muted">
+            <div className="mt-2 h-2 w-full max-w-xs overflow-hidden rounded-full bg-muted">
               <motion.div
                 className={`h-full rounded-full ${statusColor}`}
                 initial={{ width: 0 }}
@@ -224,22 +224,21 @@ function DaySummary({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={onScan} disabled={scanning}>
-            <ScanLine className="mr-1.5 h-3.5 w-3.5" />
-            {scanning ? 'Scanning…' : 'Scan for gaps'}
+          <Button variant="outline" className="h-11 px-4" onClick={onScan} disabled={scanning}>
+            <ScanLine className="mr-1.5 h-4 w-4" />
+            {scanning ? 'Scanning…' : 'Scan'}
           </Button>
           <Button
             variant="outline"
-            size="sm"
+            className="h-11 border-violet-500/40 px-4 text-violet-700 hover:bg-violet-500/10 dark:text-violet-300"
             onClick={onVoiceCapture}
-            className="border-violet-500/40 text-violet-700 hover:bg-violet-500/10 dark:text-violet-300"
           >
-            <Mic className="mr-1.5 h-3.5 w-3.5" />
+            <Mic className="mr-1.5 h-4 w-4" />
             Speak
           </Button>
           <QuickAddButton date={dateISO} />
-          <Button size="sm" onClick={onAdd} className="bg-emerald-600 hover:bg-emerald-700">
-            <Plus className="mr-1.5 h-3.5 w-3.5" />
+          <Button className="h-11 bg-emerald-600 px-4 hover:bg-emerald-700" onClick={onAdd}>
+            <Plus className="mr-1.5 h-4 w-4" />
             Add event
           </Button>
         </div>
@@ -282,8 +281,8 @@ function GapCard({ block, onResolve }: { block: UnknownBlock; onResolve: () => v
             </button>
           </p>
         </div>
-        <Button size="sm" variant="outline" className="border-amber-500/40 bg-background/50 hover:bg-amber-500/10" onClick={onResolve}>
-          <Sparkles className="mr-1 h-3 w-3" /> Resolve
+        <Button variant="outline" className="h-11 border-amber-500/40 bg-background/50 px-4 hover:bg-amber-500/10" onClick={onResolve}>
+          <Sparkles className="mr-1.5 h-4 w-4" /> Resolve
         </Button>
       </div>
     </Card>
@@ -292,19 +291,20 @@ function GapCard({ block, onResolve }: { block: UnknownBlock; onResolve: () => v
 
 function EmptyTimeline({ onAdd }: { onAdd: () => void }) {
   return (
-    <Card className="border-dashed py-12">
-      <div className="flex flex-col items-center gap-3 text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10">
-          <Clock className="h-6 w-6 text-emerald-600" />
+    <Card className="border-dashed py-16">
+      <div className="flex flex-col items-center gap-4 text-center">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10">
+          <Clock className="h-8 w-8 text-emerald-600" />
         </div>
         <div>
-          <h3 className="text-sm font-semibold">No events yet for this day</h3>
-          <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+          <h3 className="text-lg font-semibold">No events yet for this day</h3>
+          <p className="mt-2 max-w-sm text-sm text-muted-foreground">
             Start logging your day. Every event you add helps the AI learn your patterns and fill future gaps.
           </p>
         </div>
-        <Button size="sm" onClick={onAdd} className="bg-emerald-600 hover:bg-emerald-700">
-          <Plus className="mr-1.5 h-3.5 w-3.5" /> Add your first event
+        <Button size="lg" onClick={onAdd} className="h-12 bg-emerald-600 px-6 hover:bg-emerald-700">
+          <Plus className="mr-2 h-5 w-5" />
+          Add your first event
         </Button>
       </div>
     </Card>

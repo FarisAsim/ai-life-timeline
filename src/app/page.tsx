@@ -23,16 +23,19 @@ export default function Home() {
 
   useKeyboardShortcuts()
 
-  // No auto-seed — the app starts empty for real use.
-  // Users can seed demo data via the "Seed demo data" button in the header or Settings.
-
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <div className="flex flex-1 overflow-hidden">
+    <div className="min-h-screen bg-background">
+      {/* Desktop: sidebar + content side by side */}
+      <div className="flex md:flex-row flex-col">
         <AppSidebar />
-        <div className="flex min-w-0 flex-1 flex-col">
+
+        {/* Main content area */}
+        <div className="flex min-w-0 flex-1 flex-col min-h-screen">
           <AppHeader />
-          <main className="flex-1 overflow-y-auto pb-20 md:pb-16">
+          <main
+            className="flex-1 overflow-y-auto pb-24 md:pb-8"
+            aria-label="Main content"
+          >
             {view === 'timeline' && <TimelineView />}
             {view === 'calendar' && <CalendarView />}
             {view === 'unknown' && <UnknownBlocksView />}
@@ -44,33 +47,23 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Floating companion quick-access button — desktop only */}
+      {/* Desktop: floating companion button + footer */}
       {view !== 'companion' && <CompanionFab />}
 
       <NotificationsPanel />
 
-      {/* Mobile bottom navigation (includes voice capture button) */}
+      {/* Mobile: bottom navigation with center voice button */}
       <MobileBottomNav />
 
-      {/* Onboarding welcome dialog (shows on first visit with no data) */}
+      {/* Onboarding */}
       <WelcomeDialog hasData={(settings?.stats?.eventCount ?? 0) > 0} />
 
-      {/* Sticky footer — hidden on mobile (replaced by bottom nav) */}
+      {/* Desktop footer */}
       <footer className="fixed bottom-0 left-0 right-0 z-10 hidden border-t bg-background/80 backdrop-blur-md md:block">
-        <div className="flex items-center justify-between px-4 py-2 text-[11px] text-muted-foreground md:px-6">
+        <div className="flex items-center justify-between px-6 py-2 text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5">
-            <Sparkles className="h-3 w-3 text-emerald-500" />
+            <Sparkles className="h-3 w-3 text-emerald-500" aria-hidden="true" />
             AI Life Timeline — Never lose a moment
-          </span>
-          <span className="hidden items-center gap-3 sm:flex">
-            <kbd className="rounded border bg-muted px-1 py-0.5 text-[9px] font-semibold">T</kbd>
-            <kbd className="rounded border bg-muted px-1 py-0.5 text-[9px] font-semibold">K</kbd>
-            <kbd className="rounded border bg-muted px-1 py-0.5 text-[9px] font-semibold">U</kbd>
-            <kbd className="rounded border bg-muted px-1 py-0.5 text-[9px] font-semibold">C</kbd>
-            <kbd className="rounded border bg-muted px-1 py-0.5 text-[9px] font-semibold">I</kbd>
-            <kbd className="rounded border bg-muted px-1 py-0.5 text-[9px] font-semibold">/</kbd>
-            <kbd className="rounded border bg-muted px-1 py-0.5 text-[9px] font-semibold">N</kbd>
-            <span className="ml-1">navigate</span>
           </span>
         </div>
       </footer>
@@ -83,12 +76,11 @@ function CompanionFab() {
   return (
     <button
       onClick={() => setView('companion')}
-      className="fixed bottom-12 right-6 z-20 hidden items-center gap-2 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-600 px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-violet-500/30 transition-transform hover:scale-105 md:flex"
+      className="fixed bottom-6 right-6 z-20 hidden items-center gap-2 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-600 px-5 py-3 text-sm font-medium text-white shadow-lg shadow-violet-500/30 transition-transform hover:scale-105 md:flex"
       aria-label="Open AI Companion"
     >
-      <Sparkles className="h-4 w-4" />
+      <Sparkles className="h-4 w-4" aria-hidden="true" />
       <span>Ask AI</span>
     </button>
   )
 }
-

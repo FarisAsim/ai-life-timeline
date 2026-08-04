@@ -137,16 +137,17 @@ function EventFormBody({
             onChange={(e) => setTitle(e.target.value)}
             placeholder="e.g. Deep work — coding"
             autoFocus
+            className="h-11"
           />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="grid gap-2">
             <Label htmlFor="ev-start">Start</Label>
-            <Input id="ev-start" type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} />
+            <Input id="ev-start" type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} className="h-11" />
           </div>
           <div className="grid gap-2">
             <Label htmlFor="ev-end">End</Label>
-            <Input id="ev-end" type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} />
+            <Input id="ev-end" type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} className="h-11" />
           </div>
         </div>
         <div className="grid gap-2">
@@ -167,7 +168,7 @@ function EventFormBody({
         </div>
         <div className="grid gap-2">
           <Label htmlFor="ev-loc">Location (optional)</Label>
-          <Input id="ev-loc" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Office, Home, Gym" />
+          <Input id="ev-loc" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Office, Home, Gym" className="h-11" />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="ev-desc">Description (optional)</Label>
@@ -184,8 +185,9 @@ function EventFormBody({
             value={tagsInput}
             onChange={(e) => setTagsInput(e.target.value)}
             placeholder="project-x, health, urgent"
+            className="h-11"
           />
-          <p className="text-[10px] text-muted-foreground">Comma-separated. Use tags to group events across categories.</p>
+          <p className="text-xs text-muted-foreground">Comma-separated. Use tags to group events across categories.</p>
         </div>
       </div>
       <DialogFooter>
