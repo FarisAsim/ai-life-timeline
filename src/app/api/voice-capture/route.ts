@@ -72,35 +72,45 @@ async function parseTextToEvent(userId: string, transcript: string, shouldCreate
   const now = new Date()
 
   const isArabic = detectedLanguage === 'ar' || detectedLanguage === 'mixed'
+
+  // CRITICAL: Use a unified prompt that enforces same-language title and correct time parsing
   const systemPrompt = isArabic
-    ? `أنت مساعد صوتي لتطبيق تسجيل الحياة. حلل ما قاله المستخدم وحوله إلى حدث منظم.
+    ? `أنت مساعد صوتي لتطبيق تسجيل الحياة. مهمتك تحليل كلام المستخدم وإنشاء حدث.
+
+قواعد صارمة:
+1. العنوان (title) لازم يكون بنفس لغة المستخدم. لو قال "جيم" اكتب "جيم". لو قال "meeting" اكتب "meeting".
+2. التوقيت: استخدم الوقت الحالي كمرجع. الوقت الحالي: ${now.toISOString()}
+   - لو قال "دلوقتي" أو "النهارده" → startTime = الوقت الحالي
+   - لو قال "من ساعة" → startTime = قبل ساعة من دلوقتي
+   - لو قال الساعة بالرقم (مثلا "الساعة 3") → فسرها على إنها 3 العصر (15:00) لو النهارده بعد الفجر، أو 3 الفجر لو قبل كده
+   - كل الأوقات بصيغة ISO 8601 بصيطة (UTC): 2026-08-04T13:00:00.000Z
+3. المدة: استنتج مدة معقولة: جيم=60د، اجتماع=30-60د، أكل=30-45د، صلاة=15-30د، نوم=480د، دراسة=60-120د
+
 المستخدم قال: "${transcript}"
-الوقت الحالي: ${now.toISOString()}
 الفئات المتاحة: ${categoryNames}
-استخرج:
-- title: عنوان قصير للحدث (بنفس لغة المستخدم)
-- startTime: تاريخ ووقت بصيغة ISO (لو قال "دلوقتي" استخدم الوقت الحالي)
-- endTime: تاريخ ووقت بصيغة ISO (استنتج مدة معقولة: جيم=ساعة، اجتماع=30-60د، أكل=30-45د)
-- categoryName: أفضل فئة من القائمة
-- description: أي تفاصيل إضافية
-رد بـ JSON فقط:
-{ "title": "...", "startTime": "ISO", "endTime": "ISO", "categoryName": "..." أو null, "description": "..." أو null }`
-    : `You are a voice assistant for a life-logging app. Parse the user's spoken input into a structured timeline event.
-The user said: "${transcript}"
-Current time: ${now.toISOString()}
+
+رد بـ JSON فقط بدون أي نص إضافي:
+{ "title": "العنوان بنفس لغة المستخدم", "startTime": "ISO", "endTime": "ISO", "categoryName": "اسم الفئة أو null", "description": "تفاصيل أو null" }`
+    : `You are a voice assistant for a life-logging app. Parse the user's input into a timeline event.
+
+STRICT RULES:
+1. The title MUST be in the same language the user spoke. If they said "gym", write "gym". If they said "جيم", write "جيم".
+2. Time: Current time is ${now.toISOString()}. Use it as reference.
+   - "just now" or "right now" → startTime = current time
+   - "an hour ago" → startTime = 1 hour before now
+   - "at 3pm" → startTime = today at 15:00
+   - All times in ISO 8601 UTC format: 2026-08-04T13:00:00.000Z
+3. Duration: gym=60m, meeting=30-60m, meal=30-45m, prayer=15-30m, sleep=480m, study=60-120m
+
+User said: "${transcript}"
 Available categories: ${categoryNames}
-Extract:
-- title: short label (same language as user)
-- startTime: ISO datetime
-- endTime: ISO datetime (infer duration: gym=1h, meeting=30-60m, meal=30-45m)
-- categoryName: best matching category or null
-- description: any extra context
-Respond with ONLY valid JSON:
-{ "title": "...", "startTime": "ISO", "endTime": "ISO", "categoryName": "..." or null, "description": "..." or null }`
+
+Respond with ONLY valid JSON, no extra text:
+{ "title": "title in user's language", "startTime": "ISO", "endTime": "ISO", "categoryName": "category or null", "description": "details or null" }`
 
   const completion = await zai.chat.completions.create({
     messages: [
-      { role: 'assistant', content: 'You output strictly valid JSON with no extra text.' },
+      { role: 'assistant', content: 'You output strictly valid JSON with no extra text. Never translate the title to a different language than what the user spoke.' },
       { role: 'user', content: systemPrompt },
     ],
     thinking: { type: 'disabled' },
@@ -111,6 +121,28 @@ Respond with ONLY valid JSON:
   try {
     const cleaned = raw.replace(/```json/g, '').replace(/```/g, '').trim()
     parsed = JSON.parse(cleaned)
+
+    // Validate and fix times
+    const parsedStart = new Date(parsed.startTime || '')
+    const parsedEnd = new Date(parsed.endTime || '')
+
+    // If times are invalid, use sensible defaults
+    if (isNaN(parsedStart.getTime())) {
+      parsed.startTime = now.toISOString()
+    }
+    if (isNaN(parsedEnd.getTime())) {
+      parsed.endTime = new Date(now.getTime() + 60 * 60 * 1000).toISOString()
+    }
+
+    // If end is before start, fix it
+    if (new Date(parsed.endTime!).getTime() <= new Date(parsed.startTime!).getTime()) {
+      parsed.endTime = new Date(new Date(parsed.startTime!).getTime() + 60 * 60 * 1000).toISOString()
+    }
+
+    // Ensure title is not empty
+    if (!parsed.title || parsed.title.trim().length === 0) {
+      parsed.title = transcript.slice(0, 60)
+    }
   } catch {
     parsed = {
       title: transcript.slice(0, 60),
@@ -121,13 +153,20 @@ Respond with ONLY valid JSON:
     }
   }
 
-  // Resolve category
+  // Resolve category - try exact match, then case-insensitive
   let categoryId: string | null = null
   if (parsed.categoryName) {
     const cat = await db.category.findFirst({
       where: { userId, name: { equals: parsed.categoryName } },
     })
-    categoryId = cat?.id ?? null
+    if (cat) {
+      categoryId = cat.id
+    } else {
+      // Try case-insensitive by fetching all and matching manually (SQLite limitation)
+      const allCats = await db.category.findMany({ where: { userId } })
+      const matched = allCats.find((c) => c.name.toLowerCase() === parsed.categoryName!.toLowerCase())
+      categoryId = matched?.id ?? null
+    }
   }
 
   const eventData = {

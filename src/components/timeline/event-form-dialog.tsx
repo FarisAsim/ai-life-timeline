@@ -11,7 +11,7 @@ import { useCategories, useCreateEvent, useUpdateEvent } from '@/hooks/use-data'
 import type { TimelineEvent } from '@/lib/types'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
-import { Loader2 } from 'lucide-react'
+import { Loader2, ChevronDown } from 'lucide-react'
 
 function toLocalInput(d: Date) {
   const pad = (n: number) => String(n).padStart(2, '0')
@@ -128,75 +128,70 @@ function EventFormBody({
 
   return (
     <>
-      <div className="grid gap-4 py-2">
-        <div className="grid gap-2">
-          <Label htmlFor="ev-title">Title</Label>
-          <Input
-            id="ev-title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g. Deep work — coding"
-            autoFocus
-            className="h-11"
-          />
-        </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="grid gap-2">
-            <Label htmlFor="ev-start">Start</Label>
+      <div className="grid gap-3 py-2">
+        {/* Title - the only required field, big and prominent */}
+        <Input
+          id="ev-title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder={isEdit ? 'Event title' : 'What are you doing now?'}
+          autoFocus
+          className="h-12 text-base"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && title.trim()) {
+              e.preventDefault()
+              submit()
+            }
+          }}
+        />
+
+        {/* Quick time row - simple and mobile-friendly */}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <Label htmlFor="ev-start" className="mb-1 block text-xs text-muted-foreground">Start</Label>
             <Input id="ev-start" type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} className="h-11" />
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="ev-end">End</Label>
+          <div>
+            <Label htmlFor="ev-end" className="mb-1 block text-xs text-muted-foreground">End</Label>
             <Input id="ev-end" type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} className="h-11" />
           </div>
         </div>
-        <div className="grid gap-2">
-          <Label htmlFor="ev-cat">Category</Label>
+
+        {/* Category - quick horizontal scroll on mobile */}
+        <div>
+          <Label className="mb-1 block text-xs text-muted-foreground">Category</Label>
           <Select value={categoryId} onValueChange={setCategoryId}>
-            <SelectTrigger id="ev-cat">
-              <SelectValue placeholder="Select category" />
-            </SelectTrigger>
+            <SelectTrigger id="ev-cat" className="h-11"><SelectValue placeholder="Select category" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="none">No category</SelectItem>
               {categories?.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
-                </SelectItem>
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
-        <div className="grid gap-2">
-          <Label htmlFor="ev-loc">Location (optional)</Label>
-          <Input id="ev-loc" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Office, Home, Gym" className="h-11" />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="ev-desc">Description (optional)</Label>
-          <Textarea id="ev-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="What happened?" />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="ev-notes">Notes (optional)</Label>
-          <Textarea id="ev-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Private notes" />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="ev-tags">Tags (optional)</Label>
-          <Input
-            id="ev-tags"
-            value={tagsInput}
-            onChange={(e) => setTagsInput(e.target.value)}
-            placeholder="project-x, health, urgent"
-            className="h-11"
-          />
-          <p className="text-xs text-muted-foreground">Comma-separated. Use tags to group events across categories.</p>
-        </div>
+
+        {/* Optional details - collapsible */}
+        <details className="group">
+          <summary className="flex h-9 cursor-pointer items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+            <ChevronDown className="h-3 w-3 transition-transform group-open:rotate-180" />
+            More details
+          </summary>
+          <div className="mt-2 space-y-2">
+            <Input id="ev-loc" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location (optional)" className="h-11" />
+            <Textarea id="ev-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="Description (optional)" />
+            <Textarea id="ev-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Notes (optional)" />
+            <Input id="ev-tags" value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} placeholder="Tags: project-x, health" className="h-11" />
+          </div>
+        </details>
       </div>
       <DialogFooter>
-        <Button variant="outline" onClick={onDone} disabled={pending}>
+        <Button variant="outline" onClick={onDone} disabled={pending} className="h-11">
           Cancel
         </Button>
-        <Button onClick={submit} disabled={pending} className="bg-emerald-600 hover:bg-emerald-700">
+        <Button onClick={submit} disabled={pending || !title.trim()} className="h-11 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700">
           {pending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
-          {isEdit ? 'Save changes' : 'Create event'}
+          {isEdit ? 'Save' : 'Add'}
         </Button>
       </DialogFooter>
     </>
