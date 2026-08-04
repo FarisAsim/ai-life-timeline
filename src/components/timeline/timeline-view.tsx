@@ -182,7 +182,7 @@ function DaySummary({
   }[status]
 
   return (
-    <Card className="overflow-hidden border-0 bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent">
+    <Card className="glass-card overflow-hidden border-0 bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent">
       <div className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between md:p-5">
         <div className="flex items-start gap-3">
           <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-background/80 text-center shadow-sm">

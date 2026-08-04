@@ -34,7 +34,7 @@ export function AppHeader() {
 
   return (
     <header
-      className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur-md"
+      className="sticky top-0 z-20 border-b border-border/50 glass"
       role="banner"
     >
       <div className="flex items-center justify-between gap-2 px-4 py-3 md:px-6">

@@ -24,7 +24,7 @@ export default function Home() {
   useKeyboardShortcuts()
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background bg-mesh">
       {/* Desktop: sidebar + content side by side */}
       <div className="flex md:flex-row flex-col">
         <AppSidebar />

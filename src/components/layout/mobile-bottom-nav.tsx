@@ -24,7 +24,7 @@ export function MobileBottomNav() {
   return (
     <>
       <nav
-        className="fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around border-t bg-background/95 backdrop-blur-lg md:hidden"
+        className="fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around border-t border-border/50 glass"
         style={{
           paddingBottom: 'env(safe-area-inset-bottom)',
           height: 'calc(4rem + env(safe-area-inset-bottom))',
@@ -52,10 +52,10 @@ export function MobileBottomNav() {
           )
         })}
 
-        {/* Center: Voice capture — prominent 56px button */}
+        {/* Center: Voice capture — prominent 56px button with glow */}
         <button
           onClick={() => setVoiceOpen(true)}
-          className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/40 transition-transform active:scale-90"
+          className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/40 transition-transform active:scale-90 pulse-glow"
           aria-label="Record voice to add event"
         >
           <Mic className="h-6 w-6" aria-hidden="true" />
