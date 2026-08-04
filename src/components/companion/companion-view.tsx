@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/hooks/use-translation'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -21,11 +22,18 @@ interface ChatMessage {
   createdAt: string
 }
 
-const SUGGESTIONS = [
+const SUGGESTIONS_EN = [
   'Add a gym session for tomorrow at 6am',
   'What did I do yesterday afternoon?',
   'Resolve my biggest gap from the AI guess',
   'Remind me to review my timeline tonight',
+]
+
+const SUGGESTIONS_AR = [
+  'ضيف جلسة جيم بكرة الساعة 6 الصبح',
+  'أنا عملت إيه امبارح بالليل؟',
+  'حل أكبر فجوة من تخمين الذكاء الاصطناعي',
+  'فكرني أراجع الخط الزمني النهارده بالليل',
 ]
 
 export function CompanionView() {
@@ -35,6 +43,9 @@ export function CompanionView() {
   const [loadingConv, setLoadingConv] = useState(false)
   const [recording, setRecording] = useState(false)
   const [transcribing, setTranscribing] = useState(false)
+
+  const { t, locale } = useTranslation()
+  const suggestions = locale === 'ar-EG' ? SUGGESTIONS_AR : SUGGESTIONS_EN
 
   const chat = useCompanionChat()
   const { data: conversations } = useConversations()
@@ -187,7 +198,7 @@ export function CompanionView() {
   }
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-9rem)] max-w-4xl flex-col gap-4 px-4 py-4 md:px-6">
+    <div className="mx-auto flex h-[calc(100vh-12rem)] max-w-4xl flex-col gap-4 px-4 py-4 md:h-[calc(100vh-9rem)] md:px-6">
       {/* Top bar */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
@@ -196,12 +207,12 @@ export function CompanionView() {
             <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-background bg-emerald-500" />
           </div>
           <div>
-            <div className="text-sm font-semibold">Timeline Companion</div>
-            <div className="text-[11px] text-muted-foreground">Grounded in your actual timeline data</div>
+            <div className="text-sm font-semibold">{t('companion.title')}</div>
+            <div className="text-xs text-muted-foreground">{t('companion.subtitle')}</div>
           </div>
         </div>
         <Button variant="outline" size="sm" onClick={newChat}>
-          <MessageSquare className="mr-1.5 h-3.5 w-3.5" /> New chat
+          <MessageSquare className="mr-1.5 h-3.5 w-3.5" /> {t('companion.newChat')}
         </Button>
       </div>
 
@@ -249,7 +260,7 @@ export function CompanionView() {
                   <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-violet-500 [animation-delay:-0.15s]" />
                   <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-violet-500" />
                 </span>
-                Companion is thinking…
+                {t('companion.thinking')}
               </div>
             )}
           </div>
@@ -277,7 +288,7 @@ export function CompanionView() {
               send()
             }
           }}
-          placeholder={recording ? 'Listening…' : transcribing ? 'Transcribing…' : 'Ask about your timeline, or tap the mic to speak'}
+          placeholder={recording ? t('common.voice.listening') : transcribing ? t('common.voice.transcribing') : t('companion.placeholder')}
           disabled={chat.isPending}
           className="h-10"
         />
@@ -290,19 +301,21 @@ export function CompanionView() {
 }
 
 function WelcomeScreen({ onPick }: { onPick: (s: string) => void }) {
+  const { t, locale } = useTranslation()
+  const suggestions = locale === 'ar-EG' ? SUGGESTIONS_AR : SUGGESTIONS_EN
   return (
     <div className="flex flex-col items-center gap-5 py-8 text-center">
       <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white shadow-md">
         <Sparkles className="h-7 w-7" />
       </div>
       <div>
-        <h2 className="text-base font-semibold">Ask me anything about your timeline</h2>
+        <h2 className="text-base font-semibold">{t('companion.welcome')}</h2>
         <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
           I have access to your recent events and unresolved gaps. I never fabricate — if I don't know, I'll tell you and point to the gap.
         </p>
       </div>
       <div className="grid w-full max-w-md gap-2">
-        {SUGGESTIONS.map((s) => (
+        {suggestions.map((s) => (
           <button
             key={s}
             onClick={() => onPick(s)}

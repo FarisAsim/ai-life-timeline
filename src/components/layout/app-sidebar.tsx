@@ -57,10 +57,11 @@ export function AppSidebar() {
 
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex w-80 max-w-[85vw] flex-col border-r bg-card/95 backdrop-blur-xl transition-transform duration-300 md:static md:z-0 md:w-72 md:translate-x-0 md:bg-card',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full',
+          'fixed inset-y-0 left-0 z-50 w-80 max-w-[85vw] flex-col border-r bg-card/95 backdrop-blur-xl transition-transform duration-300 md:static md:z-0 md:w-72 md:flex md:translate-x-0 md:bg-card',
+          sidebarOpen ? 'flex translate-x-0' : 'hidden -translate-x-full md:flex',
         )}
         aria-label="Navigation sidebar"
+        aria-hidden={!sidebarOpen}
       >
         {/* Brand */}
         <div className="flex items-center justify-between gap-2 border-b px-5 py-4">

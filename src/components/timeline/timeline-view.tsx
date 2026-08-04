@@ -21,6 +21,7 @@ import type { TimelineEvent, UnknownBlock } from '@/lib/types'
 import { CATEGORY_COLOR_MAP } from '@/lib/types'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/hooks/use-translation'
 
 type Row =
   | { kind: 'event'; data: TimelineEvent }
@@ -31,6 +32,7 @@ export function TimelineView() {
   const { data: events, isLoading: eventsLoading } = useTimelineDay()
   const { data: blocks, isLoading: blocksLoading } = useUnknownBlocks()
   const detectGaps = useDetectGaps()
+  const { t } = useTranslation()
 
   // Listen for the 'timeline:new-event' CustomEvent (dispatched by the 'n' keyboard shortcut)
   const [creating, setCreating] = useState(false)
@@ -165,6 +167,7 @@ function DaySummary({
   onAdd: () => void
   onVoiceCapture: () => void
 }) {
+  const { t } = useTranslation()
   const hours = (trackedMinutes / 60).toFixed(1)
   const awakeMinutes = today
     ? Math.max(0, differenceInMinutes(new Date(), new Date(date.setHours(6, 0, 0, 0))))
@@ -189,11 +192,11 @@ function DaySummary({
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-bold">
-                {today ? 'Today' : format(date, 'EEEE')}
+                {today ? t('timeline.today') : format(date, 'EEEE')}
               </h2>
               <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold text-white ${statusColor}`}>
                 <span className="h-1.5 w-1.5 rounded-full bg-white/90" />
-                {status === 'green' ? 'Complete' : status === 'yellow' ? 'Partial' : 'Incomplete'}
+                {status === 'green' ? (t('timeline.complete')) : status === 'yellow' ? 'Partial' : 'Incomplete'}
               </span>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -226,7 +229,7 @@ function DaySummary({
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" className="h-11 px-4" onClick={onScan} disabled={scanning}>
             <ScanLine className="mr-1.5 h-4 w-4" />
-            {scanning ? 'Scanning…' : 'Scan'}
+            {scanning ? t('timeline.scanning') : t('timeline.scanGaps')}
           </Button>
           <Button
             variant="outline"
@@ -234,12 +237,12 @@ function DaySummary({
             onClick={onVoiceCapture}
           >
             <Mic className="mr-1.5 h-4 w-4" />
-            Speak
+            {t('common.voice.startRecording')}
           </Button>
           <QuickAddButton date={dateISO} />
           <Button className="h-11 bg-emerald-600 px-4 hover:bg-emerald-700" onClick={onAdd}>
             <Plus className="mr-1.5 h-4 w-4" />
-            Add event
+            {t('timeline.addEvent')}
           </Button>
         </div>
       </div>
@@ -290,6 +293,7 @@ function GapCard({ block, onResolve }: { block: UnknownBlock; onResolve: () => v
 }
 
 function EmptyTimeline({ onAdd }: { onAdd: () => void }) {
+  const { t } = useTranslation()
   return (
     <Card className="border-dashed py-16">
       <div className="flex flex-col items-center gap-4 text-center">
@@ -297,14 +301,14 @@ function EmptyTimeline({ onAdd }: { onAdd: () => void }) {
           <Clock className="h-8 w-8 text-emerald-600" />
         </div>
         <div>
-          <h3 className="text-lg font-semibold">No events yet for this day</h3>
+          <h3 className="text-lg font-semibold">{t('timeline.empty')}</h3>
           <p className="mt-2 max-w-sm text-sm text-muted-foreground">
             Start logging your day. Every event you add helps the AI learn your patterns and fill future gaps.
           </p>
         </div>
         <Button size="lg" onClick={onAdd} className="h-12 bg-emerald-600 px-6 hover:bg-emerald-700">
           <Plus className="mr-2 h-5 w-5" />
-          Add your first event
+          {t('timeline.addFirst')}
         </Button>
       </div>
     </Card>
