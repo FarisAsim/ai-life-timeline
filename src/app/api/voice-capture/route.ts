@@ -73,40 +73,44 @@ async function parseTextToEvent(userId: string, transcript: string, shouldCreate
 
   const isArabic = detectedLanguage === 'ar' || detectedLanguage === 'mixed'
 
-  // CRITICAL: Use a unified prompt that enforces same-language title and correct time parsing
+  // CRITICAL: The prompt MUST enforce same-language title and ask for missing info
   const systemPrompt = isArabic
-    ? `أنت مساعد صوتي لتطبيق تسجيل الحياة. مهمتك تحليل كلام المستخدم وإنشاء حدث.
+    ? `أنت مساعد صوتي ذكي لتطبيق تسجيل الحياة.
 
-قواعد صارمة:
-1. العنوان (title) لازم يكون بنفس لغة المستخدم. لو قال "جيم" اكتب "جيم". لو قال "meeting" اكتب "meeting".
-2. التوقيت: استخدم الوقت الحالي كمرجع. الوقت الحالي: ${now.toISOString()}
+قواعد صارمة جداً:
+1. العنوان (title) لازم يكون بنفس لغة المستخدم بالظبط. لو قال "جيم" اكتب "جيم". لو قال "meeting" اكتب "meeting". لو قال "صلاة" اكتب "صلاة". ممنوع تترجم.
+2. التوقيت: الوقت الحالي: ${now.toISOString()}
    - لو قال "دلوقتي" أو "النهارده" → startTime = الوقت الحالي
-   - لو قال "من ساعة" → startTime = قبل ساعة من دلوقتي
-   - لو قال الساعة بالرقم (مثلا "الساعة 3") → فسرها على إنها 3 العصر (15:00) لو النهارده بعد الفجر، أو 3 الفجر لو قبل كده
-   - كل الأوقات بصيغة ISO 8601 بصيطة (UTC): 2026-08-04T13:00:00.000Z
-3. المدة: استنتج مدة معقولة: جيم=60د، اجتماع=30-60د، أكل=30-45د، صلاة=15-30د، نوم=480د، دراسة=60-120د
+   - لو قال "من ساعة" → startTime = قبل ساعة
+   - لو قال "الساعة 7" أو "7" → فسرها 7 مساءً (19:00) لو النهارده بعد الفجر
+   - كل الأوقات بصيغة ISO 8601 UTC
+3. المدة: جيم=60د، اجتماع=30-60د، أكل=30-45د، صلاة=15-30د، نوم=480د، دراسة=60-120د
+4. لو المستخدم ماقالش وقت: ضع startTime = null و endTime = null (النظام هيسأله بعدين)
+5. لو المستخدم قال وقت بس ماقالش مدة: استنتج مدة معقولة
 
 المستخدم قال: "${transcript}"
 الفئات المتاحة: ${categoryNames}
 
-رد بـ JSON فقط بدون أي نص إضافي:
-{ "title": "العنوان بنفس لغة المستخدم", "startTime": "ISO", "endTime": "ISO", "categoryName": "اسم الفئة أو null", "description": "تفاصيل أو null" }`
-    : `You are a voice assistant for a life-logging app. Parse the user's input into a timeline event.
+رد بـ JSON فقط:
+{ "title": "العنوان بنفس لغة المستخدم", "startTime": "ISO أو null", "endTime": "ISO أو null", "categoryName": "اسم الفئة أو null", "description": "تفاصيل أو null", "missingTime": true أو false }`
+    : `You are a smart voice assistant for a life-logging app.
 
 STRICT RULES:
-1. The title MUST be in the same language the user spoke. If they said "gym", write "gym". If they said "جيم", write "جيم".
-2. Time: Current time is ${now.toISOString()}. Use it as reference.
-   - "just now" or "right now" → startTime = current time
+1. The title MUST be in the EXACT same language the user spoke. "gym" → "gym", "جيم" → "جيم". NEVER translate.
+2. Time: Current time: ${now.toISOString()}
+   - "just now" → startTime = current time
    - "an hour ago" → startTime = 1 hour before now
-   - "at 3pm" → startTime = today at 15:00
-   - All times in ISO 8601 UTC format: 2026-08-04T13:00:00.000Z
+   - "at 7" or "7pm" → startTime = today at 19:00
+   - All times in ISO 8601 UTC
 3. Duration: gym=60m, meeting=30-60m, meal=30-45m, prayer=15-30m, sleep=480m, study=60-120m
+4. If user didn't mention a time: set startTime = null, endTime = null (system will ask them)
+5. If user mentioned time but no duration: infer a reasonable duration
 
 User said: "${transcript}"
 Available categories: ${categoryNames}
 
-Respond with ONLY valid JSON, no extra text:
-{ "title": "title in user's language", "startTime": "ISO", "endTime": "ISO", "categoryName": "category or null", "description": "details or null" }`
+Respond with ONLY valid JSON:
+{ "title": "title in user's language", "startTime": "ISO or null", "endTime": "ISO or null", "categoryName": "category or null", "description": "details or null", "missingTime": true or false }`
 
   const completion = await zai.chat.completions.create({
     messages: [
@@ -117,29 +121,46 @@ Respond with ONLY valid JSON, no extra text:
   })
 
   const raw = completion.choices[0]?.message?.content ?? ''
-  let parsed: { title?: string; startTime?: string; endTime?: string; categoryName?: string | null; description?: string | null } = {}
+  let parsed: { title?: string; startTime?: string | null; endTime?: string | null; categoryName?: string | null; description?: string | null; missingTime?: boolean } = {}
   try {
     const cleaned = raw.replace(/```json/g, '').replace(/```/g, '').trim()
     parsed = JSON.parse(cleaned)
+
+    // Handle missingTime — if user didn't specify time, return a prompt asking for it
+    if (parsed.missingTime || !parsed.startTime) {
+      const isAr = detectedLanguage === 'ar' || detectedLanguage === 'mixed'
+      const askMessage = isAr
+        ? `تمام! ${parsed.title || 'الحدث'} امتى؟`
+        : `Got it! What time is ${parsed.title || 'this event'}?`
+      return NextResponse.json({
+        transcript,
+        detectedLanguage,
+        event: {
+          title: parsed.title || transcript.slice(0, 60),
+          startTime: null,
+          endTime: null,
+          categoryName: parsed.categoryName ?? null,
+          description: parsed.description ?? null,
+        },
+        missingTime: true,
+        askMessage,
+      })
+    }
 
     // Validate and fix times
     const parsedStart = new Date(parsed.startTime || '')
     const parsedEnd = new Date(parsed.endTime || '')
 
-    // If times are invalid, use sensible defaults
     if (isNaN(parsedStart.getTime())) {
       parsed.startTime = now.toISOString()
     }
     if (isNaN(parsedEnd.getTime())) {
-      parsed.endTime = new Date(now.getTime() + 60 * 60 * 1000).toISOString()
+      parsed.endTime = new Date(new Date(parsed.startTime!).getTime() + 60 * 60 * 1000).toISOString()
     }
-
-    // If end is before start, fix it
     if (new Date(parsed.endTime!).getTime() <= new Date(parsed.startTime!).getTime()) {
       parsed.endTime = new Date(new Date(parsed.startTime!).getTime() + 60 * 60 * 1000).toISOString()
     }
 
-    // Ensure title is not empty
     if (!parsed.title || parsed.title.trim().length === 0) {
       parsed.title = transcript.slice(0, 60)
     }

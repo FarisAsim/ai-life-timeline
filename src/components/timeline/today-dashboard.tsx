@@ -123,7 +123,7 @@ export function TodayDashboard() {
                 onClick={s.onClick}
                 className="group text-left"
               >
-                <Card className="glass-card flex h-14 flex-col justify-center p-2 transition-all hover:shadow-md">
+                <Card className="glass-card flex h-14 flex-col items-center justify-center p-2 text-center transition-all hover:shadow-md">
                   <div className="flex items-center gap-1">
                     <div className={cn('flex h-5 w-5 items-center justify-center rounded', toneClasses)}>
                       <Icon className="h-3 w-3" />

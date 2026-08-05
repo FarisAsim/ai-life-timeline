@@ -249,7 +249,19 @@
 
 /* ===== RTL ===== */
 html[dir="rtl"] {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: var(--font-cairo), 'Cairo', 'Segoe UI', Tahoma, sans-serif;
+}
+html[dir="ltr"] {
+  font-family: var(--font-geist-sans), 'Geist', system-ui, sans-serif;
+}
+
+/* RTL: sidebar opens from right */
+html[dir="rtl"] .sidebar-drawer {
+  right: 0 !important;
+  left: auto !important;
+}
+html[dir="rtl"] .sidebar-drawer.sidebar-hidden {
+  transform: translateX(100%) !important;
 }
 
 /* ===== REDUCED MOTION ===== */
