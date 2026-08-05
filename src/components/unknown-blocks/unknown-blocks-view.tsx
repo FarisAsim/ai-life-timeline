@@ -12,12 +12,16 @@ import { format } from 'date-fns'
 import { Hourglass, Sparkles, AlertTriangle, CheckCircle2, HelpCircle, Clock } from 'lucide-react'
 import type { UnknownBlock } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/hooks/use-translation'
 
 export function UnknownBlocksView() {
   const [tab, setTab] = useState<'open' | 'all'>('open')
   const { data: openBlocks, isLoading: openLoading } = useUnknownBlocks(false)
   const { data: allBlocks, isLoading: allLoading } = useUnknownBlocks(true)
   const [resolving, setResolving] = useState<UnknownBlock | null>(null)
+  const { locale } = useTranslation()
+  const isAr = locale === 'ar-EG'
+  const tr = (en: string, ar: string) => isAr ? ar : en
 
   const blocks = tab === 'open' ? openBlocks : allBlocks
   const loading = tab === 'open' ? openLoading : allLoading
@@ -30,9 +34,9 @@ export function UnknownBlocksView() {
     <div className="mx-auto max-w-3xl space-y-4 px-4 py-5 md:px-6">
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
-        <StatCard label="Open gaps" value={openCount} icon={Hourglass} tone="amber" />
-        <StatCard label="High severity" value={highCount} icon={AlertTriangle} tone="rose" />
-        <StatCard label="Untracked hours" value={`${totalGapHours.toFixed(1)}h`} icon={Clock} tone="orange" />
+        <StatCard label={tr('Open gaps', 'فجوات مفتوحة')} value={openCount} icon={Hourglass} tone="amber" />
+        <StatCard label={tr('High severity', 'خطيرة')} value={highCount} icon={AlertTriangle} tone="rose" />
+        <StatCard label={tr('Untracked', 'غير متتبع')} value={`${totalGapHours.toFixed(1)}${isAr ? 'س' : 'h'}`} icon={Clock} tone="orange" />
       </div>
 
       <Card className="p-4">
@@ -41,9 +45,9 @@ export function UnknownBlocksView() {
             <Hourglass className="h-4.5 w-4.5 text-amber-600" />
           </div>
           <div className="text-sm">
-            <div className="font-semibold">The engine that protects "never lose a moment"</div>
+            <div className="font-semibold">{tr('The engine that protects "never lose a moment"', 'المحرك اللي بيحمي "ماتفوّتش لحظة"')}</div>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Every gap over 15 minutes becomes an Unknown Block. Resolve each one through text, an AI Guess, or mark it as a known-unknown. Your answers train the AI.
+              {tr('Every gap over 15 minutes becomes an Unknown Block. Resolve each one through text, AI Guess, or mark as unknown. Your answers train the AI.', 'كل فجوة فوق 15 دقيقة بتبقى Unknown Block. حل كل واحدة بالنص أو تخمين الذكاء الاصطناعي أو علمها كأنك مش فاكر. إجاباتك بتمرن الذكاء الاصطناعي.')}
             </p>
           </div>
         </div>
@@ -51,8 +55,8 @@ export function UnknownBlocksView() {
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as 'open' | 'all')}>
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="open">Open ({openCount})</TabsTrigger>
-          <TabsTrigger value="all">History</TabsTrigger>
+          <TabsTrigger value="open">{tr('Open', 'مفتوحة')} ({openCount})</TabsTrigger>
+          <TabsTrigger value="all">{tr('History', 'السجل')}</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -69,11 +73,11 @@ export function UnknownBlocksView() {
               <CheckCircle2 className="h-6 w-6 text-emerald-600" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold">{tab === 'open' ? 'No open gaps' : 'No history yet'}</h3>
+              <h3 className="text-sm font-semibold">{tab === 'open' ? tr('No open gaps', 'مفيش فجوات مفتوحة') : tr('No history yet', 'مفيش سجل لسه')}</h3>
               <p className="mt-1 max-w-sm text-xs text-muted-foreground">
                 {tab === 'open'
-                  ? 'Your timeline is fully accounted for. The AI will keep watching for new gaps.'
-                  : 'Resolved and confirmed-unknown blocks will appear here.'}
+                  ? tr('Your timeline is fully accounted for.', 'خطك الزمني متسجل بالكامل.')
+                  : tr('Resolved blocks will appear here.', 'الفجوات المحلولة هتظهر هنا.')}
               </p>
             </div>
           </div>

@@ -8,18 +8,23 @@ import {
 } from 'lucide-react'
 import type { ViewName } from '@/lib/types'
 import { VoiceCaptureDialog } from '@/components/timeline/voice-capture-dialog'
-
-const MOBILE_NAV: { id: ViewName; icon: typeof LayoutList; label: string }[] = [
-  { id: 'timeline', icon: LayoutList, label: 'Home' },
-  { id: 'calendar', icon: CalendarDays, label: 'Calendar' },
-  { id: 'unknown', icon: CircleHelp, label: 'Gaps' },
-  { id: 'insights', icon: Compass, label: 'Stats' },
-]
+import { useTranslation } from '@/hooks/use-translation'
 
 export function MobileBottomNav() {
   const view = useAppStore((s) => s.view)
   const setView = useAppStore((s) => s.setView)
   const [voiceOpen, setVoiceOpen] = useState(false)
+  const { t, locale } = useTranslation()
+  const isAr = locale === 'ar-EG'
+
+  const tr = (en: string, ar: string) => isAr ? ar : en
+
+  const navItems = [
+    { id: 'timeline' as ViewName, icon: LayoutList, label: tr('Home', 'الرئيسية') },
+    { id: 'calendar' as ViewName, icon: CalendarDays, label: tr('Calendar', 'التقويم') },
+    { id: 'unknown' as ViewName, icon: CircleHelp, label: tr('Gaps', 'الفجوات') },
+    { id: 'insights' as ViewName, icon: Compass, label: tr('Stats', 'إحصائيات') },
+  ]
 
   return (
     <>
@@ -32,7 +37,7 @@ export function MobileBottomNav() {
         aria-label="Mobile navigation"
       >
         {/* Left items */}
-        {MOBILE_NAV.slice(0, 2).map((item) => {
+        {navItems.slice(0, 2).map((item) => {
           const Icon = item.icon
           const active = view === item.id
           return (
@@ -62,7 +67,7 @@ export function MobileBottomNav() {
         </button>
 
         {/* Right items */}
-        {MOBILE_NAV.slice(2, 4).map((item) => {
+        {navItems.slice(2, 4).map((item) => {
           const Icon = item.icon
           const active = view === item.id
           return (

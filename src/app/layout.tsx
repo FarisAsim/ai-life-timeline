@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Cairo } from "next/font/google";
+import { Inter, Cairo } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { Providers } from "@/components/providers";
 
-const geistSans = Geist({
+const inter = Inter({
   variable: "--font-geist-sans",
   subsets: ["latin"],
 });
@@ -56,7 +56,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${cairo.variable} antialiased bg-background text-foreground`}
+        className={`${inter.variable} ${cairo.variable} antialiased bg-background text-foreground`}
       >
         <Providers>
           {children}

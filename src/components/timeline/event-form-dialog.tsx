@@ -74,7 +74,8 @@ function EventFormBody({
 
   const isEdit = !!existing
   const initStart = existing ? toLocalInput(new Date(existing.startTime)) : toLocalInput(defaultStart ?? new Date())
-  const initEnd = existing ? toLocalInput(new Date(existing.endTime)) : toLocalInput(defaultEnd ?? new Date((defaultStart ?? new Date()).getTime() + 60 * 60 * 1000))
+  // DON'T default end to +1h — leave it empty so user must set it
+  const initEnd = existing ? toLocalInput(new Date(existing.endTime)) : (defaultEnd ? toLocalInput(defaultEnd) : '')
 
   const [title, setTitle] = useState(existing?.title ?? '')
   const [description, setDescription] = useState(existing?.description ?? '')
@@ -89,11 +90,15 @@ function EventFormBody({
 
   const submit = async () => {
     if (!title.trim()) {
-      toast.error('Title is required')
+      toast.error('Title required')
       return
     }
-    if (!start || !end) {
-      toast.error('Start and end time are required')
+    if (!start) {
+      toast.error('Start time required')
+      return
+    }
+    if (!end) {
+      toast.error('End time required — how long will this last?')
       return
     }
     const startDate = new Date(start)
