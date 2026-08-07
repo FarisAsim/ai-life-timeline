@@ -96,23 +96,23 @@ export function TodayDashboard() {
   return (
     <div className="space-y-2">
       {/* Compact stats row + live clock */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-stretch gap-2">
         {/* Live clock */}
-        <div className="glass-card flex h-14 shrink-0 flex-col items-center justify-center rounded-xl px-3">
-          <span className="text-lg font-bold tabular-nums leading-none">{timeStr}</span>
-          <span className="text-[10px] text-muted-foreground">{isAr ? 'الآن' : 'now'}</span>
+        <div className="glass-card flex h-16 shrink-0 flex-col items-center justify-center rounded-2xl px-4">
+          <span className="text-xl font-extrabold tabular-nums leading-none tracking-tight">{timeStr}</span>
+          <span className="mt-1 text-xs font-medium text-muted-foreground">{isAr ? 'الآن' : 'now'}</span>
         </div>
 
         {/* Compact stat cards */}
-        <div className="grid flex-1 grid-cols-4 gap-1.5">
+        <div className="grid flex-1 grid-cols-4 gap-2">
           {stats.map((s, i) => {
             const Icon = s.icon
             const toneClasses = {
-              emerald: 'bg-emerald-500/10 text-emerald-600',
-              amber: 'bg-amber-500/10 text-amber-600',
-              rose: 'bg-rose-500/10 text-rose-600',
-              violet: 'bg-violet-500/10 text-violet-600',
-              teal: 'bg-teal-500/10 text-teal-600',
+              emerald: 'bg-emerald-500/15 text-emerald-600',
+              amber: 'bg-amber-500/15 text-amber-600',
+              rose: 'bg-rose-500/15 text-rose-600',
+              violet: 'bg-violet-500/15 text-violet-600',
+              teal: 'bg-teal-500/15 text-teal-600',
             }[s.tone]
             return (
               <motion.button
@@ -121,16 +121,14 @@ export function TodayDashboard() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2, delay: i * 0.03 }}
                 onClick={s.onClick}
-                className="group text-left"
+                className="group"
               >
-                <Card className="glass-card flex h-14 flex-col items-center justify-center p-2 text-center transition-all hover:shadow-md">
-                  <div className="flex items-center gap-1">
-                    <div className={cn('flex h-5 w-5 items-center justify-center rounded', toneClasses)}>
-                      <Icon className="h-3 w-3" />
-                    </div>
-                    <span className="text-sm font-bold leading-none">{s.value}</span>
+                <Card className="glass-card flex h-16 flex-col items-center justify-center gap-1 rounded-2xl p-2 text-center transition-all hover:shadow-md hover:scale-[1.02]">
+                  <div className={cn('flex h-7 w-7 items-center justify-center rounded-lg', toneClasses)}>
+                    <Icon className="h-4 w-4" />
                   </div>
-                  <span className="mt-0.5 text-[10px] text-muted-foreground">{s.subtitle}</span>
+                  <span className="text-sm font-extrabold leading-none tracking-tight">{s.value}</span>
+                  <span className="text-[11px] font-medium text-muted-foreground">{s.subtitle}</span>
                 </Card>
               </motion.button>
             )
