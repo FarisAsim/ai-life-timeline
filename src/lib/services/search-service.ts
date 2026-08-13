@@ -1,7 +1,7 @@
 import ZAI from 'z-ai-web-dev-sdk'
 import { db } from '@/lib/db'
 import { format } from 'date-fns'
-import type { TimelineEvent, Category } from '@/lib/types'
+import type { TimelineEvent, Attachment, Category } from '@/lib/types'
 
 let zaiInstance: Awaited<ReturnType<typeof ZAI.create>> | null = null
 async function getZAI() {
@@ -27,7 +27,12 @@ export async function semanticSearch(userId: string, query: string, limit = 20):
   const start = new Date(end.getTime() - 90 * 24 * 60 * 60 * 1000)
   const events = await db.timelineEvent.findMany({
     where: { userId, startTime: { gte: start, lte: end } },
-    include: { attachments: { where: { type: 'voice_note' }, select: { transcript: true } } },
+    include: {
+      attachments: {
+        where: { type: 'voice_note' },
+        select: { id: true, transcript: true, filename: true, mimeType: true, size: true, createdAt: true },
+      },
+    },
     orderBy: { startTime: 'desc' },
     take: 200,
   })
@@ -52,7 +57,13 @@ export async function semanticSearch(userId: string, query: string, limit = 20):
 
   const candidates = preFiltered.length > 0 ? preFiltered.slice(0, 60) : events.slice(0, 40)
 
-  const zai = await getZAI()
+  let zai: Awaited<ReturnType<typeof ZAI.create>> | null = null
+  try {
+    zai = await getZAI()
+  } catch {
+    // LLM unavailable (e.g., no AI provider configured) — degrade gracefully to keyword ranking.
+    return keywordFallback(candidates, keywords, catMap, limit)
+  }
 
   const candidateText = candidates
     .map((e, i) => {
@@ -92,11 +103,27 @@ Return ONLY a JSON array of objects with the most relevant matches (max 20). Eac
     })
   }
 
+  if (rankings.length === 0) {
+    return keywordFallback(candidates, keywords, catMap, limit)
+  }
+
   const results: SearchResult[] = []
   for (const r of rankings) {
     if (r.index < 0 || r.index >= candidates.length) continue
     const e = candidates[r.index]
     const cat = e.categoryId ? catMap.get(e.categoryId) ?? null : null
+    const tags = e.tags ? e.tags.split(',').map((t) => t.trim()).filter(Boolean) : []
+    const attachments: Attachment[] = (e.attachments ?? []).map((a) => ({
+      id: a.id,
+      eventId: e.id,
+      type: 'voice_note',
+      filename: a.filename ?? '',
+      mimeType: a.mimeType ?? 'audio/webm',
+      size: a.size ?? 0,
+      hasData: true,
+      transcript: a.transcript,
+      createdAt: a.createdAt.toISOString(),
+    }))
     results.push({
       event: {
         id: e.id,
@@ -108,8 +135,10 @@ Return ONLY a JSON array of objects with the most relevant matches (max 20). Eac
         durationMinutes: e.durationMinutes,
         location: e.location,
         notes: e.notes,
+        tags,
         categoryId: e.categoryId,
         category: cat,
+        attachments,
         confidenceScore: e.confidenceScore,
         source: e.source as TimelineEvent['source'],
         createdAt: e.createdAt.toISOString(),
@@ -121,5 +150,48 @@ Return ONLY a JSON array of objects with the most relevant matches (max 20). Eac
     if (results.length >= limit) break
   }
 
+  return results.sort((a, b) => b.score - a.score)
+}
+
+function keywordFallback(
+  candidates: {
+    id: string; title: string; description: string | null; startTime: Date; endTime: Date; durationMinutes: number; location: string | null; notes: string | null; tags: string | null; categoryId: string | null; confidenceScore: number; source: string
+  }[],
+  keywords: string[],
+  catMap: Map<string, Category>,
+  limit: number,
+): SearchResult[] {
+  const results: SearchResult[] = []
+  for (const e of candidates) {
+    const hay = `${e.title} ${e.description ?? ''} ${e.notes ?? ''} ${e.location ?? ''}`.toLowerCase()
+    const overlap = keywords.filter((k) => hay.includes(k)).length
+    if (overlap === 0) continue
+    const cat = e.categoryId ? catMap.get(e.categoryId) ?? null : null
+    const tags = e.tags ? e.tags.split(',').map((t) => t.trim()).filter(Boolean) : []
+    results.push({
+      event: {
+        id: e.id,
+        userId: '',
+        title: e.title,
+        description: e.description,
+        startTime: e.startTime.toISOString(),
+        endTime: e.endTime.toISOString(),
+        durationMinutes: e.durationMinutes,
+        location: e.location,
+        notes: e.notes,
+        tags,
+        categoryId: e.categoryId,
+        category: cat,
+        attachments: [],
+        confidenceScore: e.confidenceScore,
+        source: e.source as TimelineEvent['source'],
+        createdAt: '',
+        updatedAt: '',
+      },
+      score: overlap / Math.max(1, keywords.length),
+      reason: 'keyword match',
+    })
+    if (results.length >= limit) break
+  }
   return results.sort((a, b) => b.score - a.score)
 }

@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { format } from 'date-fns'
 import { listEventsForRange, createEvent, updateEvent } from './timeline-service'
 import { listOpenBlocks, resolveBlockWithText } from './gap-detection-service'
+import { OverlapError } from './overlap-service'
 
 let zaiInstance: Awaited<ReturnType<typeof ZAI.create>> | null = null
 async function getZAI() {
@@ -222,9 +223,16 @@ async function executeAction(
         if (d.startTime) update.startTime = d.startTime
         if (d.endTime) update.endTime = d.endTime
         if (d.title) update.title = d.title
-        const event = await updateEvent(userId, d.eventId, update)
-        if (!event) return { executed: false, detail: 'Event not found' }
-        return { executed: true, detail: `Updated event "${event.title}"`, eventId: event.id }
+        try {
+          const event = await updateEvent(userId, d.eventId, update)
+          if (!event) return { executed: false, detail: 'Event not found' }
+          return { executed: true, detail: `Updated event "${event.title}"`, eventId: event.id }
+        } catch (e) {
+          if (e instanceof OverlapError) {
+            return { executed: false, detail: 'The new time overlaps another event' }
+          }
+          throw e
+        }
       }
       case 'resolve_gap': {
         if (!d.blockId || !d.title) return { executed: false, detail: 'Missing blockId or title' }

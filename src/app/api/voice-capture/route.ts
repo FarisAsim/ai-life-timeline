@@ -3,6 +3,7 @@ import ZAI from 'z-ai-web-dev-sdk'
 import { getDemoUser } from '@/lib/services/demo-user'
 import { db } from '@/lib/db'
 import { createEvent } from '@/lib/services/timeline-service'
+import { OverlapError } from '@/lib/services/overlap-service'
 
 let zaiInstance: Awaited<ReturnType<typeof ZAI.create>> | null = null
 async function getZAI() {
@@ -58,7 +59,13 @@ export async function POST(req: NextRequest) {
 }
 
 async function parseTextToEvent(userId: string, transcript: string, shouldCreate?: boolean) {
-  const zai = await getZAI()
+  let zai: Awaited<ReturnType<typeof ZAI.create>> | null = null
+  try {
+    zai = await getZAI()
+  } catch {
+    // AI provider unavailable — fall back to basic keyword-based event creation.
+    return fallbackParse(transcript, shouldCreate)
+  }
 
   // Detect language
   const arabicChars = (transcript.match(/[\u0600-\u06FF]/g) || []).length
@@ -112,13 +119,19 @@ Available categories: ${categoryNames}
 Respond with ONLY valid JSON:
 { "title": "title in user's language", "startTime": "ISO or null", "endTime": "ISO or null", "categoryName": "category or null", "description": "details or null", "missingTime": true or false }`
 
-  const completion = await zai.chat.completions.create({
-    messages: [
-      { role: 'assistant', content: 'You output strictly valid JSON with no extra text. Never translate the title to a different language than what the user spoke.' },
-      { role: 'user', content: systemPrompt },
-    ],
-    thinking: { type: 'disabled' },
-  })
+  let completion: any
+  try {
+    completion = await zai.chat.completions.create({
+      messages: [
+        { role: 'assistant', content: 'You output strictly valid JSON with no extra text. Never translate the title to a different language than what the user spoke.' },
+        { role: 'user', content: systemPrompt },
+      ],
+      thinking: { type: 'disabled' },
+    })
+  } catch {
+    // AI provider failed mid-request — fall back to basic parsing
+    return fallbackParse(transcript, shouldCreate)
+  }
 
   const raw = completion.choices[0]?.message?.content ?? ''
   let parsed: { title?: string; startTime?: string | null; endTime?: string | null; categoryName?: string | null; description?: string | null; missingTime?: boolean } = {}
@@ -200,9 +213,16 @@ Respond with ONLY valid JSON:
     confidenceScore: 0.9,
   }
 
-  let createdEvent = null
+  let createdEvent: Awaited<ReturnType<typeof createEvent>> | null = null
   if (shouldCreate) {
-    createdEvent = await createEvent(userId, eventData)
+    try {
+      createdEvent = await createEvent(userId, eventData)
+    } catch (e) {
+      if (e instanceof OverlapError) {
+        return NextResponse.json({ error: 'The parsed time overlaps an existing event', fallback: true }, { status: 409 })
+      }
+      throw e
+    }
   }
 
   return NextResponse.json({
@@ -210,5 +230,72 @@ Respond with ONLY valid JSON:
     detectedLanguage,
     event: { ...eventData, categoryName: parsed.categoryName },
     created: createdEvent ? { id: createdEvent.id, title: createdEvent.title } : null,
+  })
+}
+
+/**
+ * No-AI fallback: basic keyword parsing when the AI provider is unavailable.
+ * Detects an hour mention (e.g. "الساعة ثلاثة", "at 3") and common category
+ * keywords, otherwise records the full text as the event title for now.
+ */
+async function fallbackParse(transcript: string, shouldCreate?: boolean): Promise<NextResponse> {
+  const now = new Date()
+  const detectedLanguage = /[\u0600-\u06FF]/.test(transcript) ? 'ar' : 'en'
+
+  // Extract hour: Arabic "الساعة ثلاثة/٣" or English "at 3" / "3pm"
+  const hourNum: { [key: string]: number } = {
+    'واحد': 1, 'اثنين': 2, 'ثلاث': 3, 'أربع': 4, 'خمس': 5, 'ست': 6, 'سبع': 7, 'ثمان': 8, 'تسع': 9, 'عشر': 10, '١٢': 12,
+    '١': 1, '٢': 2, '٣': 3, '٤': 4, '٥': 5, '٦': 6, '٧': 7, '٨': 8, '٩': 9, '١٠': 10, '١١': 11,
+  }
+  const hourMatch =
+    transcript.match(/الساعة\s+(واحد|اثنين|ثلاث|أربع|خمس|ست|سبع|ثمان|تسع|عشر|١٢|١|٢|٣|٤|٥|٦|٧|٨|٩|١٠|١١)/i) ||
+    transcript.match(/\b(?:at\s+)?(1[0-2]|\d)\s*(pm)\b/i) ||
+    transcript.match(/\b(?:at\s+)?(\d{1,2})\b/i)
+  const userId = (await getDemoUser()).id
+
+  let startTime: string = now.toISOString()
+  if (hourMatch) {
+    const isPm = /pm|مساء/i.test(transcript)
+    const token = hourMatch[1]
+    let num = hourNum[token] ?? Number(token)
+    if (isNaN(num) || num < 1 || num > 12) num = now.getHours() % 12 || 12
+    const hour24 = isPm && num < 12 ? num + 12 : num === 12 && !isPm ? 0 : hourMatch[2] ? num + (isPm && num < 12 ? 12 : 0) : num
+    const clamped = Math.max(0, Math.min(23, hour24))
+    startTime = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), clamped, 0, 0)).toISOString()
+  }
+
+  const categories = await db.category.findMany({ where: { userId } })
+  const catMap = new Map(categories.map((c) => [c.name.toLowerCase(), c.id]))
+  const matchedCat = categories.find((c) => transcript.toLowerCase().includes(c.name.toLowerCase()))
+  const categoryId = matchedCat?.id ?? catMap.get(detectedLanguage === 'ar' ? 'عمل' : 'work') ?? null
+
+  const eventData = {
+    title: transcript.slice(0, 60),
+    startTime,
+    endTime: new Date(new Date(startTime).getTime() + 60 * 60 * 1000).toISOString(),
+    categoryId,
+    description: transcript,
+    source: 'user_manual' as const,
+    confidenceScore: 0.6,
+  }
+
+  let createdEvent: Awaited<ReturnType<typeof createEvent>> | null = null
+  if (shouldCreate) {
+    try {
+      createdEvent = await createEvent(userId, eventData)
+    } catch (e) {
+      if (e instanceof OverlapError) {
+        return NextResponse.json({ error: 'The parsed time overlaps an existing event', fallback: true }, { status: 409 })
+      }
+      throw e
+    }
+  }
+
+  return NextResponse.json({
+    transcript,
+    detectedLanguage,
+    event: { ...eventData, categoryName: matchedCat?.name ?? null },
+    created: createdEvent ? { id: createdEvent.id, title: createdEvent.title } : null,
+    aiUnavailable: true,
   })
 }

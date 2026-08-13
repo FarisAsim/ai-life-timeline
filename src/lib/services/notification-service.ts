@@ -3,6 +3,7 @@ import { format, subDays } from 'date-fns'
 import { listOpenBlocks } from './gap-detection-service'
 import { listGoals } from './goal-service'
 import { getInsights } from './analytics-service'
+import { getUserTimezone, formatInUserTz } from './timezone-service'
 
 export interface CreateNotificationInput {
   userId: string
@@ -54,7 +55,7 @@ export async function countUnread(userId: string) {
 export async function runNotificationEngine(userId: string) {
   const blocks = await listOpenBlocks(userId)
   const now = new Date()
-  const created = []
+  const created: Awaited<ReturnType<typeof createNotification>>[] = []
 
   // Only consider blocks from the last 2 days
   const recentBlocks = blocks.filter((b) => {
@@ -74,12 +75,15 @@ export async function runNotificationEngine(userId: string) {
     if (existing) continue
 
     const hours = Math.round(block.durationMinutes / 60 * 10) / 10
-    const time = format(new Date(block.startTime), 'h:mm a')
+    // Format times in the user's timezone for clarity
+    const tz = await getUserTimezone(userId)
+    const timeStart = formatInUserTz(new Date(block.startTime), tz, { hour: 'numeric', minute: '2-digit' })
+    const timeEnd = formatInUserTz(new Date(block.endTime), tz, { hour: 'numeric', minute: '2-digit' })
     const n = await createNotification({
       userId,
       type: 'gap_prompt',
-      title: `Missing ${hours}h of your day`,
-      body: `I noticed a gap between ${time} and ${format(new Date(block.endTime), 'h:mm a')}. Help me complete your timeline.`,
+      title: `${hours}h unaccounted for`,
+      body: `There's an unexplained gap from ${timeStart} to ${timeEnd}. Help me complete your timeline.`,
       actionType: 'resolve_gap',
       actionPayload: { blockId: block.id, startTime: block.startTime, endTime: block.endTime },
     })

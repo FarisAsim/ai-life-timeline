@@ -2,6 +2,7 @@ import { db } from '@/lib/db'
 import { addMinutes, subDays, startOfDay } from 'date-fns'
 import { getDemoUser } from './demo-user'
 import { detectGapsForDay } from './gap-detection-service'
+import { findOverlappingEvent } from './overlap-service'
 
 // Generates a realistic week of timeline events so the app has rich data on first load.
 export async function seedDemoData() {
@@ -64,12 +65,17 @@ export async function seedDemoData() {
       const end = addMinutes(start, ev.dur)
       if (isToday && start > now) continue
       const cappedEnd = isToday && end > now ? now : end
+      if (cappedEnd <= start) continue
       const cat = byName.get(ev.cat)
       // Avoid duplicates
       const existing = await db.timelineEvent.findFirst({
         where: { userId: user.id, title: ev.title, startTime: start },
       })
       if (existing) continue
+      // Skip this event if it would overlap an already-seeded event
+      // (keeps the timeline overlap-free, honoring the PRD design)
+      const conflict = await findOverlappingEvent(user.id, start, cappedEnd)
+      if (conflict) continue
       await db.timelineEvent.create({
         data: {
           userId: user.id,

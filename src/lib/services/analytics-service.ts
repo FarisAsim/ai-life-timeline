@@ -1,9 +1,12 @@
 import { db } from '@/lib/db'
+import { getUserTimezone, getUserNow, formatInUserTz, wallClockDate } from './timezone-service'
 import { differenceInMinutes, format, subDays, startOfDay, endOfDay } from 'date-fns'
 import type { Category, InsightData } from '@/lib/types'
 
 export async function getInsights(userId: string, rangeDays = 30): Promise<InsightData> {
-  const end = new Date()
+  // "Today" and day buckets are computed in the user's timezone
+  const tz = await getUserTimezone(userId)
+  const end = await getUserNow(userId)
   const start = subDays(end, rangeDays)
 
   const events = await db.timelineEvent.findMany({
@@ -42,9 +45,11 @@ export async function getInsights(userId: string, rangeDays = 30): Promise<Insig
 
   // Productive hours — minutes per hour-of-day, weighted by category productivity
   const productiveCats = new Set(['Work', 'Study', 'Exercise', 'Prayer', 'Personal'])
+  const tzHour = await getUserTimezone(userId)
   const hourBuckets: { minutes: number; score: number }[] = Array.from({ length: 24 }, () => ({ minutes: 0, score: 0 }))
   for (const ev of events) {
-    const hour = ev.startTime.getHours()
+    // Bucket by the event's hour in the USER's timezone
+    const hour = Number(new Intl.DateTimeFormat('en-US', { timeZone: tzHour, hour: 'numeric', hour12: false }).format(ev.startTime)) % 24
     const cat = ev.categoryId ? catMap.get(ev.categoryId) : null
     const isProductive = cat ? productiveCats.has(cat.name) : false
     hourBuckets[hour].minutes += ev.durationMinutes
@@ -56,27 +61,34 @@ export async function getInsights(userId: string, rangeDays = 30): Promise<Insig
     score: b.score,
   }))
 
-  // Daily totals
+  // Daily totals (in user timezone), keyed as ISO yyyy-MM-dd so the
+  // Insights chart can parse each date with `new Date(d + 'T00:00:00')`
   const dayMap = new Map<string, number>()
   for (const ev of events) {
-    const key = format(ev.startTime, 'yyyy-MM-dd')
+    const key = formatInUserTz(ev.startTime, tz, { year: 'numeric', month: '2-digit', day: '2-digit' })
     dayMap.set(key, (dayMap.get(key) ?? 0) + ev.durationMinutes)
   }
   const dailyTotals = Array.from(dayMap.entries())
-    .map(([date, minutes]) => ({ date, minutes }))
+    .map(([date, minutes]) => {
+      // Convert MM/DD/YYYY wall key back to ISO yyyy-MM-dd
+      const [m, d, y] = date.split('/')
+      return { date: `${y}-${m}-${d}`, minutes }
+    })
     .sort((a, b) => a.date.localeCompare(b.date))
 
-  // Completeness for range
+  // Completeness for range (day boundaries in user timezone)
   let totalCovered = 0
   let totalPossible = 0
+  const tzNow = await getUserNow(userId)
   for (let i = 0; i < rangeDays; i++) {
-    const day = subDays(end, i)
-    const dayStart = startOfDay(day)
-    dayStart.setHours(6, 0, 0, 0)
-    const dayEnd = endOfDay(day)
-    dayEnd.setHours(23, 0, 0, 0)
-    if (day > new Date()) continue
-    const scanEnd = day.toDateString() === new Date().toDateString() && new Date() < dayEnd ? new Date() : dayEnd
+    const day = subDays(tzNow, i)
+    const dayStart = wallClockDate(tz, 6, 0)
+    const dayEnd = wallClockDate(tz, 23, 0)
+    // Only count wall-clock dates up to the user's current date
+    const dayKey = formatInUserTzKey(day, tz)
+    const nowKey = formatInUserTzKey(tzNow, tz)
+    if (dayKey > nowKey) continue
+    const scanEnd = dayKey === nowKey && new Date() < dayEnd ? new Date() : dayEnd
     const possible = Math.max(0, differenceInMinutes(scanEnd, dayStart))
     totalPossible += possible
   }
@@ -115,18 +127,19 @@ export async function getInsights(userId: string, rangeDays = 30): Promise<Insig
     .sort((a, b) => b.minutes - a.minutes)
     .slice(0, 12)
 
-  // Streak — consecutive days with at least 1 event
+  // Streak — consecutive days with at least 1 event (in user timezone)
   const daySet = new Set<string>()
   for (const ev of events) {
-    daySet.add(format(ev.startTime, 'yyyy-MM-dd'))
+    daySet.add(formatInUserTzKey(ev.startTime, tz))
   }
   let streakDays = 0
-  const today = new Date()
   for (let i = 0; i < rangeDays; i++) {
-    const checkDay = format(subDays(today, i), 'yyyy-MM-dd')
-    if (daySet.has(checkDay)) {
+    const checkDay = formatInUserTzKey(subDays(new Date(), i), tz)
+    const isToday = i === 0
+    const logged = daySet.has(checkDay)
+    if (logged) {
       streakDays++
-    } else if (i > 0) {
+    } else if (!isToday) {
       // Allow today to be empty (haven't logged yet) but break on a past empty day
       break
     }
@@ -146,6 +159,10 @@ export async function getInsights(userId: string, rangeDays = 30): Promise<Insig
     tagBreakdown,
     streakDays,
   }
+}
+
+function formatInUserTzKey(date: Date, tz: string): string {
+  return formatInUserTz(date, tz, { year: 'numeric', month: '2-digit', day: '2-digit' })
 }
 
 function generateWeeklySummary(

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAppStore } from '@/stores/app-store'
-import type { Category, CreateEventInput, TimelineEvent, Attachment } from '@/lib/types'
+import type { Category, TimelineEvent, Attachment } from '@/lib/types'
+import type { CreateEventInput } from '@/lib/services/timeline-service'
 
 // ---------- Categories ----------
 export function useCategories() {

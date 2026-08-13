@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { differenceInMinutes } from 'date-fns'
+import { validateEventTimes, OverlapError } from './overlap-service'
 import type { TimelineEvent, Category, EventSource, Attachment } from '@/lib/types'
 
 type EventWithRelations = Awaited<ReturnType<typeof db.timelineEvent.findFirst>> & {
@@ -104,6 +105,7 @@ export interface CreateEventInput {
 export async function createEvent(userId: string, input: CreateEventInput): Promise<TimelineEvent> {
   const start = new Date(input.startTime)
   const end = new Date(input.endTime)
+  await validateEventTimes(userId, start, end)
   const duration = Math.max(0, differenceInMinutes(end, start))
   const created = await db.timelineEvent.create({
     data: {
@@ -131,6 +133,7 @@ export async function updateEvent(userId: string, eventId: string, input: Partia
   if (!existing) return null
   const start = input.startTime ? new Date(input.startTime) : existing.startTime
   const end = input.endTime ? new Date(input.endTime) : existing.endTime
+  await validateEventTimes(userId, start, end, eventId)
   const duration = Math.max(0, differenceInMinutes(end, start))
   const updated = await db.timelineEvent.update({
     where: { id: eventId },
