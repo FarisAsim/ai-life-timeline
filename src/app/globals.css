@@ -258,13 +258,15 @@ html[dir="ltr"] body {
   font-family: var(--font-inter), system-ui, -apple-system, sans-serif !important;
 }
 
-/* RTL: sidebar opens from right */
-html[dir="rtl"] .sidebar-drawer {
-  right: 0 !important;
-  left: auto !important;
-}
-html[dir="rtl"] .sidebar-drawer.sidebar-hidden {
-  transform: translateX(100%) !important;
+/* RTL: sidebar drawer opens from right (mobile only — desktop sidebar is static) */
+@media (max-width: 767px) {
+  html[dir="rtl"] .sidebar-drawer {
+    right: 0 !important;
+    left: auto !important;
+  }
+  html[dir="rtl"] .sidebar-drawer.sidebar-hidden {
+    transform: translateX(100%) !important;
+  }
 }
 
 /* ===== REDUCED MOTION ===== */

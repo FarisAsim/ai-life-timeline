@@ -3,16 +3,14 @@
 import { useAppStore } from '@/stores/app-store'
 import { cn } from '@/lib/utils'
 import { useNotifications } from '@/hooks/use-data'
-import { useTheme } from 'next-themes'
 import { useTranslation } from '@/hooks/use-translation'
 import {
   CalendarDays, Clock, Compass, LayoutList, Bell, Search, Sparkles,
-  Hourglass, CircleHelp, Menu, X, Settings, Sun, Moon, Languages,
+  Hourglass, CircleHelp, Menu, X, Settings,
 } from 'lucide-react'
 import type { ViewName } from '@/lib/types'
 import { useEffect } from 'react'
 import { StreakBadge } from './streak-badge'
-import { useLocaleStore } from '@/stores/locale-store'
 import { motion, AnimatePresence } from 'framer-motion'
 
 const NAV_ITEMS: { id: ViewName; labelKey: 'nav.timeline' | 'nav.calendar' | 'nav.unknown' | 'nav.companion' | 'nav.insights' | 'nav.search'; icon: typeof Clock }[] = [
@@ -57,7 +55,7 @@ export function AppSidebar() {
 
       <aside
         className={cn(
-          'sidebar-drawer fixed inset-y-0 left-0 z-50 flex w-80 max-w-[85vw] flex-col border-r bg-card/95 backdrop-blur-xl transition-transform duration-300 md:static md:z-0 md:w-72 md:flex md:translate-x-0 md:bg-card',
+          'sidebar-drawer fixed inset-y-0 left-0 z-50 h-screen flex w-80 max-w-[85vw] flex-col border-r bg-card/95 backdrop-blur-xl transition-transform duration-300 md:static md:z-0 md:block md:h-screen md:w-72 md:translate-x-0 md:bg-card',
           sidebarOpen ? 'flex translate-x-0' : 'sidebar-hidden hidden -translate-x-full md:flex',
         )}
         aria-label="Navigation sidebar"
@@ -131,23 +129,21 @@ export function AppSidebar() {
           </button>
         </nav>
 
-        {/* Footer — controls + status */}
+        {/* Footer — settings button + status */}
         <div className="border-t p-3">
-          <div className="mb-2 flex items-center gap-2">
-            <ThemeToggle />
-            <LocaleToggle />
-            <button
-              onClick={() => setView('settings')}
-              className={cn(
-                'flex h-11 flex-1 items-center gap-2 rounded-xl border px-3 text-sm font-medium transition-colors hover:bg-accent',
-                view === 'settings' && 'border-emerald-500/40 bg-emerald-500/5',
-              )}
-              aria-label="Open settings"
-            >
-              <Settings className="h-4 w-4" aria-hidden="true" />
-              {t('nav.settings')}
-            </button>
-          </div>
+          <button
+            onClick={() => setView('settings')}
+            className={cn(
+              'mb-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl px-3 text-sm font-medium transition-colors',
+              view === 'settings'
+                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                : 'text-foreground/70 hover:bg-accent hover:text-foreground',
+            )}
+            aria-label="Open settings"
+          >
+            <Settings className="h-4 w-4" aria-hidden="true" />
+            {t('nav.settings')}
+          </button>
           <StreakBadge />
         </div>
       </aside>
@@ -155,30 +151,3 @@ export function AppSidebar() {
   )
 }
 
-function ThemeToggle() {
-  const { theme, setTheme } = useTheme()
-  const isDark = theme === 'dark'
-  return (
-    <button
-      onClick={() => setTheme(isDark ? 'light' : 'dark')}
-      className="flex h-11 w-11 items-center justify-center rounded-xl border text-muted-foreground transition-colors hover:bg-accent"
-      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-    >
-      {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-    </button>
-  )
-}
-
-function LocaleToggle() {
-  const locale = useLocaleStore((s) => s.locale)
-  const toggle = useLocaleStore((s) => s.toggle)
-  return (
-    <button
-      onClick={toggle}
-      className="flex h-11 w-11 items-center justify-center rounded-xl border text-muted-foreground transition-colors hover:bg-accent"
-      aria-label={locale === 'en' ? 'Switch to Arabic' : 'Switch to English'}
-    >
-      <Languages className="h-5 w-5" />
-    </button>
-  )
-}

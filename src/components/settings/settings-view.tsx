@@ -23,9 +23,12 @@ import {
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import {
-  User, Clock, Download, Trash2, Database, Shield, Sparkles, Loader2, Check, Globe, Bell, FileText,
+  User, Clock, Download, Trash2, Database, Shield, Sparkles, Loader2, Check, Globe, Bell, FileText, Sun, Moon, Languages,
 } from 'lucide-react'
 import { useTranslation } from '@/hooks/use-translation'
+import { useTheme } from 'next-themes'
+import { useLocaleStore } from '@/stores/locale-store'
+import { Switch } from '@/components/ui/switch'
 
 export function SettingsView() {
   const { data, isLoading } = useSettings()
@@ -47,13 +50,16 @@ function SettingsBody({ data }: { data: { user: { id: string; name: string | nul
   const updateMut = useUpdateSettings()
   const deleteMut = useDeleteAccount()
   const seedMut = useSeed()
-  const { t, locale } = useTranslation()
-  const isAr = locale === 'ar-EG'
+  const { t, locale: uiLocale } = useTranslation()
+  const isAr = uiLocale === 'ar-EG'
 
   const [name, setName] = useState(data.user.name ?? '')
   const [timezone, setTimezone] = useState(data.user.timezone ?? 'Africa/Cairo')
   const [quietStart, setQuietStart] = useState(data.user.quietHoursStart ?? '22:00')
   const [quietEnd, setQuietEnd] = useState(data.user.quietHoursEnd ?? '07:00')
+  const { theme, setTheme } = useTheme()
+  const locale = useLocaleStore((s) => s.locale)
+  const toggleLocale = useLocaleStore((s) => s.toggle)
 
   const tr = (en: string, ar: string) => isAr ? ar : en
 
@@ -102,6 +108,39 @@ function SettingsBody({ data }: { data: { user: { id: string; name: string | nul
         <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
           <Clock className="h-3 w-3" />
           {tr('All times in your timeline are displayed in this timezone.', 'كل الأوقات في خطك الزمني بتظهر بالمنطقة الزمنية دي.')}
+        </div>
+      </SectionCard>
+
+      {/* Appearance & language */}
+      <SectionCard icon={Sun} title={tr('Appearance & language', 'المظهر واللغة')} description={tr('Theme and interface language', 'المظهر ولغة الواجهة')}>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
+                {theme === 'dark' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+              </div>
+              <div>
+                <div className="text-sm font-medium">{tr('Dark mode', 'الوضع الليلي')}</div>
+                <p className="text-xs text-muted-foreground">{theme === 'dark' ? tr('On — dark theme active', 'مفعّل — الثيم الليلي شغال') : tr('Off — light theme active', 'مطفي — الثيم النهاري شغال')}</p>
+              </div>
+            </div>
+            <Switch checked={theme === 'dark'} onCheckedChange={(checked) => { setTheme(checked ? 'dark' : 'light'); toast.success(checked ? (isAr ? 'تم تفعيل الوضع الليلي' : 'Dark mode on') : (isAr ? 'تم تفعيل الوضع النهاري' : 'Light mode on')); }} aria-label={tr('Toggle dark mode', 'تفعيل الوضع الليلي')} />
+          </div>
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
+                <Languages className="h-4 w-4" />
+              </div>
+              <div>
+                <div className="text-sm font-medium">{tr('Interface language', 'لغة الواجهة')}</div>
+                <p className="text-xs text-muted-foreground">{locale === 'ar-EG' ? tr('العربية (مصري) — Arabic interface', 'العربية (مصري) — واجهة عربية') : tr('English — English interface', 'English — English interface')}</p>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" className="h-9 shrink-0" onClick={() => { toggleLocale(); toast.success(isAr ? 'English now' : 'العربي دلوقتي'); }}>
+              <Languages className="mr-1 h-3.5 w-3.5" />
+              {locale === 'ar-EG' ? tr('English', 'English') : tr('العربية', 'العربية')}
+            </Button>
+          </div>
         </div>
       </SectionCard>
 
