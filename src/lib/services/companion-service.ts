@@ -141,7 +141,8 @@ export async function chat(userId: string, conversationId: string | null, userMe
   } else {
     try {
       raw = await chatCompletion(messages)
-    } catch {
+    } catch (err) {
+
       raw = noAIReply(userMessage)
     }
   }

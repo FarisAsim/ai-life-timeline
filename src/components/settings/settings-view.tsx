@@ -267,7 +267,16 @@ function SettingsBody({ data }: { data: { user: { id: string; name: string | nul
 
 function AIProviderSection() {
   const { t } = useTranslation()
-  const [config, setConfig] = useState<{ apiKey: string; baseUrl: string; model: string; sttModel: string; configured: boolean } | null>(null)
+  const [config, setConfig] = useState<{
+    providerType: 'openai' | 'gemini'
+    apiKey: string
+    baseUrl: string
+    model: string
+    sttModel: string
+    geminiApiKey: string
+    geminiModel: string
+    configured: boolean
+  } | null>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -276,9 +285,18 @@ function AIProviderSection() {
     try {
       const r = await fetch('/api/settings/ai')
       const j = await r.json()
-      setConfig({ apiKey: j.apiKey ?? '', baseUrl: j.baseUrl ?? 'https://api.openai.com/v1', model: j.model ?? 'gpt-4o-mini', sttModel: j.sttModel ?? 'gpt-4o-transcribe', configured: j.configured ?? false })
+      setConfig({
+        providerType: j.providerType ?? 'openai',
+        apiKey: j.apiKey ?? '',
+        baseUrl: j.baseUrl ?? 'https://api.openai.com/v1',
+        model: j.model ?? 'gpt-4o-mini',
+        sttModel: j.sttModel ?? 'gpt-4o-transcribe',
+        geminiApiKey: j.geminiApiKey ?? '',
+        geminiModel: j.geminiModel ?? 'gemini-3.6-flash',
+        configured: j.configured ?? false,
+      })
     } catch {
-      setConfig({ apiKey: '', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', sttModel: 'gpt-4o-transcribe', configured: false })
+      setConfig({ providerType: 'openai', apiKey: '', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', sttModel: 'gpt-4o-transcribe', geminiApiKey: '', geminiModel: 'gemini-3.6-flash', configured: false })
     }
     setLoading(false)
   }, [])
@@ -308,7 +326,7 @@ function AIProviderSection() {
   }
 
   return (
-    <SectionCard icon={Sparkles} title={t('settings.aiProviderTitle')} description={t('settings.aiProviderDesc')}>
+    <SectionCard id="settings-ai-section" icon={Sparkles} title={t('settings.aiProviderTitle')} description={t('settings.aiProviderDesc')}>
       {!config || loading ? (
         <Skeleton className="h-24 rounded-xl" />
       ) : (
@@ -324,23 +342,49 @@ function AIProviderSection() {
               <span className="text-amber-700 dark:text-amber-300">{t('settings.aiOffline')}</span>
             </div>
           )}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-2">
-              <Label htmlFor="ai-api-key">{t('settings.aiApiKey')}</Label>
-              <Input id="ai-api-key" type="password" value={config.apiKey} onChange={(e) => setConfig({ ...config, apiKey: e.target.value })} placeholder="sk-..." className="h-11" />
+          <div className="grid gap-2">
+            <Label>{t('settings.aiProviderType')}</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <Button type="button" variant={config.providerType === 'openai' ? 'default' : 'outline'} size="sm" className="h-11" onClick={() => setConfig({ ...config, providerType: 'openai' })}>
+                OpenAI-compatible
+              </Button>
+              <Button type="button" variant={config.providerType === 'gemini' ? 'default' : 'outline'} size="sm" className="h-11" onClick={() => setConfig({ ...config, providerType: 'gemini' })}>
+                Google Gemini
+              </Button>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="ai-base-url">{t('settings.aiBaseUrl')}</Label>
-              <Input id="ai-base-url" value={config.baseUrl} onChange={(e) => setConfig({ ...config, baseUrl: e.target.value })} placeholder="https://api.openai.com/v1" className="h-11" />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="ai-model">{t('settings.aiChatModel')}</Label>
-              <Input id="ai-model" value={config.model} onChange={(e) => setConfig({ ...config, model: e.target.value })} className="h-11" />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="ai-stt-model">{t('settings.aiSttModel')}</Label>
-              <Input id="ai-stt-model" value={config.sttModel} onChange={(e) => setConfig({ ...config, sttModel: e.target.value })} className="h-11" />
-            </div>
+          </div>
+          <div className="mt-2 grid gap-4 sm:grid-cols-2">
+            {config.providerType === 'openai' ? (
+              <>
+                <div className="grid gap-2">
+                  <Label htmlFor="ai-api-key">{t('settings.aiApiKey')}</Label>
+                  <Input id="ai-api-key" type="password" value={config.apiKey} onChange={(e) => setConfig({ ...config, apiKey: e.target.value })} placeholder="sk-..." className="h-11" />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="ai-base-url">{t('settings.aiBaseUrl')}</Label>
+                  <Input id="ai-base-url" value={config.baseUrl} onChange={(e) => setConfig({ ...config, baseUrl: e.target.value })} placeholder="https://api.openai.com/v1" className="h-11" />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="ai-model">{t('settings.aiChatModel')}</Label>
+                  <Input id="ai-model" value={config.model} onChange={(e) => setConfig({ ...config, model: e.target.value })} className="h-11" />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="ai-stt-model">{t('settings.aiSttModel')}</Label>
+                  <Input id="ai-stt-model" value={config.sttModel} onChange={(e) => setConfig({ ...config, sttModel: e.target.value })} className="h-11" />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="grid gap-2">
+                  <Label htmlFor="ai-gemini-key">{t('settings.aiGeminiKey')}</Label>
+                  <Input id="ai-gemini-key" type="password" value={config.geminiApiKey} onChange={(e) => setConfig({ ...config, geminiApiKey: e.target.value })} placeholder="AIza..." className="h-11" />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="ai-gemini-model">{t('settings.aiGeminiModel')}</Label>
+                  <Input id="ai-gemini-model" value={config.geminiModel} onChange={(e) => setConfig({ ...config, geminiModel: e.target.value })} className="h-11" />
+                </div>
+              </>
+            )}
           </div>
           <div className="mt-3 flex items-center justify-end">
             <Button size="sm" onClick={handleSave} disabled={saving} className="h-11 bg-emerald-600 hover:bg-emerald-700">
@@ -354,9 +398,9 @@ function AIProviderSection() {
   )
 }
 
-function SectionCard({ icon: Icon, title, description, children }: { icon: typeof User; title: string; description: string; children: React.ReactNode }) {
+function SectionCard({ id, icon: Icon, title, description, children }: { id?: string; icon: typeof User; title: string; description: string; children: React.ReactNode }) {
   return (
-    <Card className="glass-card p-5">
+    <Card id={id} className="glass-card p-5">
       <div className="mb-4 flex items-start gap-3">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
           <Icon className="h-4.5 w-4.5" />

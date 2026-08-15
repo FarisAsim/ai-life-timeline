@@ -12,18 +12,26 @@ import path from 'path'
 
 const CONFIG_PATH = path.join(process.cwd(), 'ai.config.json')
 
+export type AIProviderType = 'openai' | 'gemini'
+
 export interface AIConfig {
+  providerType: AIProviderType
   apiKey: string
   baseUrl: string
   model: string
   sttModel: string
+  geminiApiKey: string
+  geminiModel: string
 }
 
 const DEFAULTS: AIConfig = {
+  providerType: (process.env.AI_PROVIDER_TYPE as AIProviderType) ?? 'openai',
   apiKey: process.env.AI_API_KEY ?? '',
   baseUrl: process.env.AI_BASE_URL ?? 'https://api.openai.com/v1',
   model: process.env.AI_MODEL ?? 'gpt-4o-mini',
   sttModel: process.env.AI_STT_MODEL ?? 'gpt-4o-transcribe',
+  geminiApiKey: process.env.GEMINI_API_KEY ?? '',
+  geminiModel: process.env.GEMINI_MODEL ?? 'gemini-3.6-flash',
 }
 
 // In-memory cache of the persisted file config
@@ -36,10 +44,13 @@ function loadFileConfig(): AIConfig {
       if (fs.existsSync(CONFIG_PATH)) {
         const raw = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8')) as Partial<AIConfig>
         fileConfig = {
+          providerType: raw.providerType ?? DEFAULTS.providerType,
           apiKey: raw.apiKey ?? '',
           baseUrl: raw.baseUrl ?? DEFAULTS.baseUrl,
           model: raw.model ?? DEFAULTS.model,
           sttModel: raw.sttModel ?? DEFAULTS.sttModel,
+          geminiApiKey: raw.geminiApiKey ?? '',
+          geminiModel: raw.geminiModel ?? DEFAULTS.geminiModel,
         }
       }
     } catch {
@@ -53,22 +64,29 @@ function loadFileConfig(): AIConfig {
 export function getAIConfig(): AIConfig & { configured: boolean } {
   const cfg = loadFileConfig()
   // Merge: file values override env defaults when explicitly set in the file
-  const apiKey = cfg.apiKey || DEFAULTS.apiKey
+  const apiKey = cfg.providerType === 'gemini' ? cfg.geminiApiKey : cfg.apiKey
   return {
+    providerType: cfg.providerType,
     apiKey: cfg.apiKey,
     baseUrl: cfg.baseUrl,
     model: cfg.model,
     sttModel: cfg.sttModel,
+    geminiApiKey: cfg.geminiApiKey,
+    geminiModel: cfg.geminiModel,
     configured: apiKey.length > 0,
   }
 }
 
-export function updateAIConfig(input: AIConfig): AIConfig {
+export function updateAIConfig(input: Partial<AIConfig>): AIConfig {
+  const current = loadFileConfig()
   const cfg: AIConfig = {
-    apiKey: input.apiKey ?? '',
+    providerType: input.providerType ?? current.providerType,
+    apiKey: input.apiKey ?? current.apiKey,
     baseUrl: input.baseUrl ?? DEFAULTS.baseUrl,
     model: input.model ?? DEFAULTS.model,
     sttModel: input.sttModel ?? DEFAULTS.sttModel,
+    geminiApiKey: input.geminiApiKey ?? current.geminiApiKey,
+    geminiModel: input.geminiModel ?? DEFAULTS.geminiModel,
   }
   // Persist to the local JSON file
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2), 'utf-8')
