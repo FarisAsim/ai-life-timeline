@@ -1,13 +1,8 @@
-import ZAI from 'z-ai-web-dev-sdk'
+import { chatCompletion, isRemoteAIConfigured } from '@/lib/ai-provider'
 import { db } from '@/lib/db'
 import { format } from 'date-fns'
 import type { TimelineEvent, Attachment, Category } from '@/lib/types'
 
-let zaiInstance: Awaited<ReturnType<typeof ZAI.create>> | null = null
-async function getZAI() {
-  if (!zaiInstance) zaiInstance = await ZAI.create()
-  return zaiInstance
-}
 
 export interface SearchResult {
   event: TimelineEvent
@@ -57,11 +52,8 @@ export async function semanticSearch(userId: string, query: string, limit = 20):
 
   const candidates = preFiltered.length > 0 ? preFiltered.slice(0, 60) : events.slice(0, 40)
 
-  let zai: Awaited<ReturnType<typeof ZAI.create>> | null = null
-  try {
-    zai = await getZAI()
-  } catch {
-    // LLM unavailable (e.g., no AI provider configured) — degrade gracefully to keyword ranking.
+  if (!isRemoteAIConfigured()) {
+    // No AI provider configured — degrade gracefully to keyword ranking.
     return keywordFallback(candidates, keywords, catMap, limit)
   }
 
@@ -81,15 +73,16 @@ ${candidateText}
 
 Return ONLY a JSON array of objects with the most relevant matches (max 20). Each object: {"index": <number>, "score": 0.0-1.0, "reason": "one short phrase why it matches"}. Use the index number from the candidates list. Only include events that genuinely match the query intent (semantic match — even if words differ). If nothing matches, return [].`
 
-  const completion = await zai.chat.completions.create({
-    messages: [
-      { role: 'assistant', content: 'You output strictly valid JSON arrays with no extra text or markdown.' },
+  let raw: string
+  try {
+    raw = await chatCompletion([
+      { role: 'system', content: 'You output strictly valid JSON arrays with no extra text or markdown.' },
       { role: 'user', content: prompt },
-    ],
-    thinking: { type: 'disabled' },
-  })
-
-  const raw = completion.choices[0]?.message?.content ?? ''
+    ])
+  } catch {
+    // LLM request failed — degrade gracefully to keyword ranking.
+    return keywordFallback(candidates, keywords, catMap, limit)
+  }
   let rankings: { index: number; score: number; reason: string }[] = []
   try {
     const cleaned = raw.replace(/```json/g, '').replace(/```/g, '').trim()

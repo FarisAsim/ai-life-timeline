@@ -1,15 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import ZAI from 'z-ai-web-dev-sdk'
 import { getDemoUser } from '@/lib/services/demo-user'
 import { db } from '@/lib/db'
 import { createEvent } from '@/lib/services/timeline-service'
 import { OverlapError } from '@/lib/services/overlap-service'
-
-let zaiInstance: Awaited<ReturnType<typeof ZAI.create>> | null = null
-async function getZAI() {
-  if (!zaiInstance) zaiInstance = await ZAI.create()
-  return zaiInstance
-}
+import { transcribeAudio, chatCompletion, isRemoteAIConfigured } from '@/lib/ai-provider'
 
 export async function POST(req: NextRequest) {
   const user = await getDemoUser()
@@ -27,28 +21,21 @@ export async function POST(req: NextRequest) {
   const base64 = audio.replace(/^data:audio\/[a-zA-Z]+;base64,/, '')
 
   try {
-    const zai = await getZAI()
-
-    // Transcribe
+    // Transcribe with remote provider; fall back to keyword parser on failure
     let transcript = ''
-    try {
-      const asrResponse = await zai.audio.asr.create({ file_base64: base64 })
-      transcript = (asrResponse as { text?: string }).text?.trim() ?? ''
-    } catch (asrError) {
-      // ASR failed - return error so frontend can show text fallback
-      const errMsg = asrError instanceof Error ? asrError.message : 'ASR failed'
-      return NextResponse.json({
-        error: 'Could not transcribe audio. Please type instead.',
-        asrError: errMsg,
-        fallback: true,
-      }, { status: 422 })
+    let remoteSTT = isRemoteAIConfigured()
+    if (remoteSTT) {
+      try {
+        const result = await transcribeAudio(base64)
+        transcript = result.text
+      } catch {
+        remoteSTT = false
+      }
     }
 
     if (!transcript) {
-      return NextResponse.json({
-        error: 'No speech detected. Please try again or type manually.',
-        fallback: true,
-      }, { status: 422 })
+      // Remote STT unavailable or empty → keyword-based local fallback
+      return fallbackParse(base64, shouldCreate)
     }
 
     return parseTextToEvent(user.id, transcript, shouldCreate)
@@ -59,14 +46,6 @@ export async function POST(req: NextRequest) {
 }
 
 async function parseTextToEvent(userId: string, transcript: string, shouldCreate?: boolean) {
-  let zai: Awaited<ReturnType<typeof ZAI.create>> | null = null
-  try {
-    zai = await getZAI()
-  } catch {
-    // AI provider unavailable — fall back to basic keyword-based event creation.
-    return fallbackParse(transcript, shouldCreate)
-  }
-
   // Detect language
   const arabicChars = (transcript.match(/[\u0600-\u06FF]/g) || []).length
   const totalChars = transcript.replace(/\s/g, '').length
@@ -119,72 +98,62 @@ Available categories: ${categoryNames}
 Respond with ONLY valid JSON:
 { "title": "title in user's language", "startTime": "ISO or null", "endTime": "ISO or null", "categoryName": "category or null", "description": "details or null", "missingTime": true or false }`
 
-  let completion: any
-  try {
-    completion = await zai.chat.completions.create({
-      messages: [
-        { role: 'assistant', content: 'You output strictly valid JSON with no extra text. Never translate the title to a different language than what the user spoke.' },
-        { role: 'user', content: systemPrompt },
-      ],
-      thinking: { type: 'disabled' },
-    })
-  } catch {
-    // AI provider failed mid-request — fall back to basic parsing
-    return fallbackParse(transcript, shouldCreate)
+  let parsed: { title?: string; startTime?: string | null; endTime?: string | null; categoryName?: string | null; description?: string | null; missingTime?: boolean } = {}
+
+  if (!isRemoteAIConfigured()) {
+    // No remote AI → use smart local keyword parsing
+    return fallbackParse('', shouldCreate, transcript)
   }
 
-  const raw = completion.choices[0]?.message?.content ?? ''
-  let parsed: { title?: string; startTime?: string | null; endTime?: string | null; categoryName?: string | null; description?: string | null; missingTime?: boolean } = {}
   try {
+    const raw = await chatCompletion([
+      { role: 'system', content: 'You output strictly valid JSON with no extra text. Never translate the title to a different language than what the user spoke.' },
+      { role: 'user', content: systemPrompt },
+    ])
     const cleaned = raw.replace(/```json/g, '').replace(/```/g, '').trim()
     parsed = JSON.parse(cleaned)
-
-    // Handle missingTime — if user didn't specify time, return a prompt asking for it
-    if (parsed.missingTime || !parsed.startTime) {
-      const isAr = detectedLanguage === 'ar' || detectedLanguage === 'mixed'
-      const askMessage = isAr
-        ? `تمام! ${parsed.title || 'الحدث'} امتى؟`
-        : `Got it! What time is ${parsed.title || 'this event'}?`
-      return NextResponse.json({
-        transcript,
-        detectedLanguage,
-        event: {
-          title: parsed.title || transcript.slice(0, 60),
-          startTime: null,
-          endTime: null,
-          categoryName: parsed.categoryName ?? null,
-          description: parsed.description ?? null,
-        },
-        missingTime: true,
-        askMessage,
-      })
-    }
-
-    // Validate and fix times
-    const parsedStart = new Date(parsed.startTime || '')
-    const parsedEnd = new Date(parsed.endTime || '')
-
-    if (isNaN(parsedStart.getTime())) {
-      parsed.startTime = now.toISOString()
-    }
-    if (isNaN(parsedEnd.getTime())) {
-      parsed.endTime = new Date(new Date(parsed.startTime!).getTime() + 60 * 60 * 1000).toISOString()
-    }
-    if (new Date(parsed.endTime!).getTime() <= new Date(parsed.startTime!).getTime()) {
-      parsed.endTime = new Date(new Date(parsed.startTime!).getTime() + 60 * 60 * 1000).toISOString()
-    }
-
-    if (!parsed.title || parsed.title.trim().length === 0) {
-      parsed.title = transcript.slice(0, 60)
-    }
   } catch {
-    parsed = {
-      title: transcript.slice(0, 60),
-      startTime: now.toISOString(),
-      endTime: new Date(now.getTime() + 60 * 60 * 1000).toISOString(),
-      categoryName: null,
-      description: transcript,
-    }
+    // AI provider failed mid-request — fall back to basic parsing
+    return fallbackParse('', shouldCreate, transcript)
+  }
+
+  // Handle missingTime — if user didn't specify time, return a prompt asking for it
+  if (parsed.missingTime || !parsed.startTime) {
+    const isAr = detectedLanguage === 'ar' || detectedLanguage === 'mixed'
+    const askMessage = isAr
+      ? `تمام! ${parsed.title || 'الحدث'} امتى؟`
+      : `Got it! What time is ${parsed.title || 'this event'}?`
+    return NextResponse.json({
+      transcript,
+      detectedLanguage,
+      event: {
+        title: parsed.title || transcript.slice(0, 60),
+        startTime: null,
+        endTime: null,
+        categoryName: parsed.categoryName ?? null,
+        description: parsed.description ?? null,
+      },
+      missingTime: true,
+      askMessage,
+    })
+  }
+
+  // Validate and fix times
+  const parsedStart = new Date(parsed.startTime || '')
+  const parsedEnd = new Date(parsed.endTime || '')
+
+  if (isNaN(parsedStart.getTime())) {
+    parsed.startTime = now.toISOString()
+  }
+  if (isNaN(parsedEnd.getTime())) {
+    parsed.endTime = new Date(new Date(parsed.startTime!).getTime() + 60 * 60 * 1000).toISOString()
+  }
+  if (new Date(parsed.endTime!).getTime() <= new Date(parsed.startTime!).getTime()) {
+    parsed.endTime = new Date(new Date(parsed.startTime!).getTime() + 60 * 60 * 1000).toISOString()
+  }
+
+  if (!parsed.title || parsed.title.trim().length === 0) {
+    parsed.title = transcript.slice(0, 60)
   }
 
   // Resolve category - try exact match, then case-insensitive
@@ -234,13 +203,47 @@ Respond with ONLY valid JSON:
 }
 
 /**
- * No-AI fallback: basic keyword parsing when the AI provider is unavailable.
- * Detects an hour mention (e.g. "الساعة ثلاثة", "at 3") and common category
- * keywords, otherwise records the full text as the event title for now.
+ * No-AI / ASR-failed path: smart keyword parsing.
+ * Supports an optional transcript override (when ASR worked but LLM is unavailable).
+ * Arabic hour mentions: "الساعة ثلاثة"/"الساعة ٣" etc.
  */
-async function fallbackParse(transcript: string, shouldCreate?: boolean): Promise<NextResponse> {
+async function fallbackParse(base64: string, shouldCreate?: boolean, transcriptOverride?: string): Promise<NextResponse> {
   const now = new Date()
+  const transcript = transcriptOverride ?? ''
   const detectedLanguage = /[\u0600-\u06FF]/.test(transcript) ? 'ar' : 'en'
+
+  if (!transcript) {
+    // ASR and AI both unavailable — record a voice note with a generic title
+    const userId = (await getDemoUser()).id
+    const eventData = {
+      title: detectedLanguage === 'ar' ? 'ملاحظة صوتية' : 'Voice note',
+      startTime: now.toISOString(),
+      endTime: new Date(now.getTime() + 60 * 60 * 1000).toISOString(),
+      categoryId: null,
+      description: detectedLanguage === 'ar' ? 'ملاحظة صوتية مسجلة بدون نص (ادخل النص يدويًا من تعديل الحدث)' : 'Voice note recorded without transcription (enter the text by editing the event)',
+      source: 'user_manual' as const,
+      confidenceScore: 0.5,
+    }
+    let createdEvent: Awaited<ReturnType<typeof createEvent>> | null = null
+    if (shouldCreate) {
+      try {
+        createdEvent = await createEvent(userId, eventData)
+      } catch (e) {
+        if (e instanceof OverlapError) {
+          return NextResponse.json({ error: 'The parsed time overlaps an existing event', fallback: true }, { status: 409 })
+        }
+        throw e
+      }
+    }
+    return NextResponse.json({
+      transcript: '',
+      detectedLanguage,
+      event: eventData,
+      created: createdEvent ? { id: createdEvent.id, title: createdEvent.title } : null,
+      aiUnavailable: true,
+      sttUnavailable: true,
+    })
+  }
 
   // Extract hour: Arabic "الساعة ثلاثة/٣" or English "at 3" / "3pm"
   const hourNum: { [key: string]: number } = {

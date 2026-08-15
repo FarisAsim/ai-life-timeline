@@ -199,13 +199,12 @@ export async function addAttachment(userId: string, eventId: string, file: { fil
   return { id: att.id, type: att.type, filename: att.filename, mimeType: att.mimeType, size: att.size, eventId: att.eventId, hasData: true, transcript: att.transcript, createdAt: att.createdAt.toISOString() }
 }
 
-// Background auto-transcription using ASR
+// Background auto-transcription using the unified AI provider (fire-and-forget)
 async function autoTranscribe(attachmentId: string, audioBase64: string) {
   try {
-    const ZAI = (await import('z-ai-web-dev-sdk')).default
-    const zai = await ZAI.create()
-    const response = await zai.audio.asr.create({ file_base64: audioBase64 })
-    const text = (response as { text?: string }).text?.trim() ?? ''
+    const { transcribeAudio, isRemoteAIConfigured } = await import('@/lib/ai-provider')
+    if (!isRemoteAIConfigured()) return
+    const { text } = await transcribeAudio(audioBase64)
     if (text) {
       await db.attachment.update({ where: { id: attachmentId }, data: { transcript: text } })
     }

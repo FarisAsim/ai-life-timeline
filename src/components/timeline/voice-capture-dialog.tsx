@@ -68,6 +68,13 @@ export function VoiceCaptureDialog({ open, onOpenChange }: VoiceCaptureDialogPro
             if (j.error) {
               if (j.fallback) { setError(j.error); setMode('text') }
               else { setError(j.error) }
+            } else if (j.aiUnavailable) {
+              // AI provider not configured — event still created locally from transcript
+              setTranscript(j.transcript || '')
+              setDetectedLanguage(j.detectedLanguage)
+              setParsedEvent(j.event)
+              setEditingTitle(j.event.title)
+              toast.success(isAr ? 'تم حفظ ملاحظتك الصوتية (ضيف مفتاح AI في الإعدادات عشان التحويل التلقائي)' : 'Voice note saved (add an AI key in Settings for automatic transcription)')
             } else {
               setTranscript(j.transcript)
               setDetectedLanguage(j.detectedLanguage)
@@ -172,7 +179,7 @@ export function VoiceCaptureDialog({ open, onOpenChange }: VoiceCaptureDialogPro
     } catch { return iso }
   }
 
-  const langLabel = detectedLanguage === 'ar' ? '🇪🇬 Arabic' : detectedLanguage === 'mixed' ? '🔀 Mixed' : '🇬🇧 English'
+  const langLabel = detectedLanguage === 'ar' ? 'عربي' : detectedLanguage === 'mixed' ? 'مختلط' : 'English'
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
@@ -183,10 +190,10 @@ export function VoiceCaptureDialog({ open, onOpenChange }: VoiceCaptureDialogPro
           <DialogHeader className="relative">
             <DialogTitle className="flex items-center gap-2 text-lg font-bold text-white">
               <Sparkles className="h-5 w-5" />
-              Voice Capture
+              {t('voice.capture.title')}
             </DialogTitle>
             <DialogDescription className="text-white/80">
-              Speak or type — AI will create an event for you
+              {t('voice.capture.desc')}
             </DialogDescription>
           </DialogHeader>
         </div>

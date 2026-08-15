@@ -1,15 +1,10 @@
-import ZAI from 'z-ai-web-dev-sdk'
+import { chatCompletion, isRemoteAIConfigured } from '@/lib/ai-provider'
 import { db } from '@/lib/db'
 import { format } from 'date-fns'
 import { listEventsForRange, createEvent, updateEvent } from './timeline-service'
 import { listOpenBlocks, resolveBlockWithText } from './gap-detection-service'
 import { OverlapError } from './overlap-service'
 
-let zaiInstance: Awaited<ReturnType<typeof ZAI.create>> | null = null
-async function getZAI() {
-  if (!zaiInstance) zaiInstance = await ZAI.create()
-  return zaiInstance
-}
 
 const SYSTEM_PROMPT = `You are the AI Companion for "AI Life Timeline" — an app that records a person's life hour-by-hour and never wants to lose a moment.
 
@@ -113,7 +108,6 @@ export interface CompanionResponse {
 }
 
 export async function chat(userId: string, conversationId: string | null, userMessage: string, userTimezone: string): Promise<CompanionResponse> {
-  const zai = await getZAI()
   const context = await buildUserContext(userId, userTimezone)
 
   // Load or create conversation
@@ -141,12 +135,16 @@ export async function chat(userId: string, conversationId: string | null, userMe
     { role: 'user' as const, content: userMessage },
   ]
 
-  const completion = await zai.chat.completions.create({
-    messages,
-    thinking: { type: 'disabled' },
-  })
-
-  const raw = completion.choices[0]?.message?.content ?? ''
+  let raw: string
+  if (!isRemoteAIConfigured()) {
+    raw = noAIReply(userMessage)
+  } else {
+    try {
+      raw = await chatCompletion(messages)
+    } catch {
+      raw = noAIReply(userMessage)
+    }
+  }
 
   // Persist messages
   await db.aIMessage.create({ data: { conversationId: conversation.id, role: 'user', content: userMessage } })
@@ -289,7 +287,6 @@ export async function generateAiGuess(userId: string, blockId: string): Promise<
   const block = await db.unknownBlock.findFirst({ where: { id: blockId, userId } })
   if (!block) return null
 
-  const zai = await getZAI()
   const events = await listEventsForRange(userId, new Date(block.startTime.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString(), block.startTime.toISOString())
 
   const prompt = `Based on this user's recent timeline patterns, guess what they were doing during an unexplained gap.
@@ -302,15 +299,18 @@ ${events.slice(0, 20).map((e) => `- ${format(new Date(e.startTime), 'EEE h:mm a'
 Respond with ONLY a JSON object (no markdown, no prose):
 { "title": "short label", "categoryId": null, "categoryName": "Work|Study|Exercise|Sleep|Prayer|Social|Screen Time|Meals|Commute|Personal or null", "confidence": 0.0-1.0, "reasoning": "one sentence" }`
 
-  const completion = await zai.chat.completions.create({
-    messages: [
-      { role: 'assistant', content: 'You output strictly valid JSON with no extra text.' },
+  let raw: string
+  if (!isRemoteAIConfigured()) {
+    return localAiGuess(block, events)
+  }
+  try {
+    raw = await chatCompletion([
+      { role: 'system', content: 'You output strictly valid JSON with no extra text.' },
       { role: 'user', content: prompt },
-    ],
-    thinking: { type: 'disabled' },
-  })
-
-  const raw = completion.choices[0]?.message?.content ?? ''
+    ])
+  } catch {
+    return localAiGuess(block, events)
+  }
   try {
     const cleaned = raw.replace(/```json/g, '').replace(/```/g, '').trim()
     const parsed = JSON.parse(cleaned)
@@ -327,5 +327,52 @@ Respond with ONLY a JSON object (no markdown, no prose):
     }
   } catch {
     return { title: 'Activity', categoryId: null, confidence: 0.3, reasoning: 'Could not determine a confident guess' }
+  }
+}
+
+/** Friendly reply when no AI provider is configured (fully offline mode). */
+function noAIReply(userMessage: string): string {
+  const hasArabic = /[\u0600-\u06FF]/.test(userMessage)
+  if (hasArabic) {
+    return 'المساعد الذكي محتاج مفتاح خدمة ذكاء اصطناعي عشان يشتغل.\n\nروح للإعدادات وافتح قسم "الذكاء الاصطناعي" وحطّ مفتاح API — والمساعد هيرد عليك فورًا.\n\nوفي الوقت ده كل باقي مميزات التطبيق شغالة عادي: التسجيل اليدوي، الإضافة السريعة، والفجوات.'
+  }
+  return "The AI assistant needs an AI service API key to be enabled.\n\nOpen Settings → 'AI Provider' and add your API key — the assistant will reply immediately after.\n\nEverything else works normally: manual entry, quick add, and gap detection."
+}
+
+/** Smart local pattern-based guess with zero AI dependency. */
+function localAiGuess(
+  block: { startTime: Date; endTime: Date; durationMinutes: number },
+  events: Array<{ startTime: Date | string; title: string; category?: { name: string } | null }>,
+): { title: string; categoryId: string | null; confidence: number; reasoning: string } {
+  const hour = block.startTime.getHours()
+  const freq: Record<string, number> = {}
+  for (const e of events) {
+    const h = new Date(e.startTime).getHours()
+    if (Math.abs(h - hour) <= 2 && e.category?.name) freq[e.category.name] = (freq[e.category.name] ?? 0) + 1
+  }
+  let best: string | null = null
+  let bestCount = 0
+  for (const [cat, count] of Object.entries(freq)) {
+    if (count > bestCount) {
+      best = cat
+      bestCount = count
+    }
+  }
+  if (!best) {
+    if (hour >= 22 || hour < 6) best = 'Sleep'
+    else if (hour >= 12 && hour <= 15) best = 'Meals'
+    else best = 'Work'
+  }
+  const ar = best === 'Sleep' ? 'نوم' : best === 'Meals' ? 'أكلة' : best === 'Prayer' ? 'صلاة' : best === 'Exercise' ? 'تمارين' : best === 'Study' ? 'مذاكرة' : `غالبًا ${best}`
+  return {
+    title: best,
+    categoryId: null,
+    confidence: bestCount > 0 ? Math.min(0.9, 0.4 + bestCount * 0.25) : 0.45,
+    reasoning:
+      bestCount > 0
+        ? `Based on your recent patterns around this time, you usually do ${best}`
+        : ar === 'نوم'
+          ? 'Based on the late hour, most likely sleep'
+          : 'No pattern data available — best guess based on the time of day',
   }
 }

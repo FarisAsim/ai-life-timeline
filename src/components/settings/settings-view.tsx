@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSettings, useUpdateSettings, useDeleteAccount, useSeed } from '@/hooks/use-data'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import {
-  User, Clock, Download, Trash2, Database, Shield, Sparkles, Loader2, Check, Globe, Bell, FileText, Sun, Moon, Languages,
+  User, Clock, Download, Trash2, Database, Shield, Sparkles, Loader2, Check, Globe, Bell, FileText, Sun, Moon, Languages, AlertCircle,
 } from 'lucide-react'
 import { useTranslation } from '@/hooks/use-translation'
 import { useTheme } from 'next-themes'
@@ -144,6 +144,8 @@ function SettingsBody({ data }: { data: { user: { id: string; name: string | nul
         </div>
       </SectionCard>
 
+      <AIProviderSection />
+
       {/* Quiet hours */}
       <SectionCard icon={Bell} title={tr('Quiet hours', 'ساعات الهدوء')} description={tr('Notifications won\'t fire during these hours', 'الإشعارات مش هتظهر خلال الوقت ده')}>
         <div className="grid grid-cols-2 gap-4">
@@ -260,6 +262,95 @@ function SettingsBody({ data }: { data: { user: { id: string; name: string | nul
         {tr('AI Life Timeline · Your data is stored locally.', 'الخط الزمني الذكي · بياناتك مخزنة محلياً.')}
       </p>
     </div>
+  )
+}
+
+function AIProviderSection() {
+  const { t } = useTranslation()
+  const [config, setConfig] = useState<{ apiKey: string; baseUrl: string; model: string; sttModel: string; configured: boolean } | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const r = await fetch('/api/settings/ai')
+      const j = await r.json()
+      setConfig({ apiKey: j.apiKey ?? '', baseUrl: j.baseUrl ?? 'https://api.openai.com/v1', model: j.model ?? 'gpt-4o-mini', sttModel: j.sttModel ?? 'gpt-4o-transcribe', configured: j.configured ?? false })
+    } catch {
+      setConfig({ apiKey: '', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', sttModel: 'gpt-4o-transcribe', configured: false })
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const handleSave = async () => {
+    if (!config) return
+    setSaving(true)
+    try {
+      const r = await fetch('/api/settings/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      })
+      const j = await r.json()
+      if (j.error) {
+        toast.error(j.error)
+      } else {
+        setConfig({ ...config, configured: j.configured ?? (config.apiKey.length > 0) })
+        toast.success(t('settings.aiSaved'))
+      }
+    } catch {
+      toast.error(t('settings.aiSaveFailed'))
+    }
+    setSaving(false)
+  }
+
+  return (
+    <SectionCard icon={Sparkles} title={t('settings.aiProviderTitle')} description={t('settings.aiProviderDesc')}>
+      {!config || loading ? (
+        <Skeleton className="h-24 rounded-xl" />
+      ) : (
+        <>
+          {config.configured ? (
+            <div className="mb-3 flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm">
+              <Check className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-emerald-700 dark:text-emerald-300">{t('settings.aiEnabled')}</span>
+            </div>
+          ) : (
+            <div className="mb-3 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+              <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+              <span className="text-amber-700 dark:text-amber-300">{t('settings.aiOffline')}</span>
+            </div>
+          )}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="ai-api-key">{t('settings.aiApiKey')}</Label>
+              <Input id="ai-api-key" type="password" value={config.apiKey} onChange={(e) => setConfig({ ...config, apiKey: e.target.value })} placeholder="sk-..." className="h-11" />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="ai-base-url">{t('settings.aiBaseUrl')}</Label>
+              <Input id="ai-base-url" value={config.baseUrl} onChange={(e) => setConfig({ ...config, baseUrl: e.target.value })} placeholder="https://api.openai.com/v1" className="h-11" />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="ai-model">{t('settings.aiChatModel')}</Label>
+              <Input id="ai-model" value={config.model} onChange={(e) => setConfig({ ...config, model: e.target.value })} className="h-11" />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="ai-stt-model">{t('settings.aiSttModel')}</Label>
+              <Input id="ai-stt-model" value={config.sttModel} onChange={(e) => setConfig({ ...config, sttModel: e.target.value })} className="h-11" />
+            </div>
+          </div>
+          <div className="mt-3 flex items-center justify-end">
+            <Button size="sm" onClick={handleSave} disabled={saving} className="h-11 bg-emerald-600 hover:bg-emerald-700">
+              {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-1.5 h-3.5 w-3.5" />}
+              {t('settings.aiSave')}
+            </Button>
+          </div>
+        </>
+      )}
+    </SectionCard>
   )
 }
 
