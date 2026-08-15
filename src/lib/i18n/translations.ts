@@ -186,7 +186,7 @@ export const translations = {
     'timeline.scanning': 'بيبحث…',
     'timeline.today': 'النهارده',
     'timeline.empty': 'مفيش أحداث لهذا اليوم',
-    'timeline.empty.desc': 'ابدأ تسجيل يومك. كل حدث بتضيفه بيساعد الذكاء الاصطناعي يتعلم أنماطك ويملأ الفجوات المستقبلية.',
+    'timeline.empty.desc': 'ابدأ تسجيل يومك. كل حدث بتسجله بيساعد الذكاء الاصطناعي يتعلم أنماطك ويملأ الفجوات المستقبلية.',
     'timeline.addFirst': 'أضف أول حدث',
     'timeline.dayAtAGlance': 'نظرة سريعة على اليوم',
     'timeline.tracked': 'تم تسجيله',
