@@ -22,7 +22,10 @@ import { CATEGORY_COLOR_MAP } from '@/lib/types'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/hooks/use-translation'
+import type { TranslationKey } from '@/lib/i18n/translations'
 
+const MONTHS_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
+const DAYS_AR = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
 type Row =
   | { kind: 'event'; data: TimelineEvent }
   | { kind: 'gap'; data: UnknownBlock }
@@ -32,8 +35,8 @@ export function TimelineView() {
   const { data: events, isLoading: eventsLoading } = useTimelineDay()
   const { data: blocks, isLoading: blocksLoading } = useUnknownBlocks()
   const detectGaps = useDetectGaps()
-  const { t } = useTranslation()
-
+  const { t, locale } = useTranslation()
+  const isAr = locale === 'ar-EG'
   // Listen for the 'timeline:new-event' CustomEvent (dispatched by the 'n' keyboard shortcut)
   const [creating, setCreating] = useState(false)
   const [resolving, setResolving] = useState<UnknownBlock | null>(null)
@@ -97,8 +100,8 @@ export function TimelineView() {
           detectGaps.mutate(selectedDate, {
             onSuccess: (d: { count?: number } | undefined) =>
               d?.count
-                ? toast.success(`Found ${d.count} new gap${d.count === 1 ? '' : 's'}`)
-                : toast.info('No new gaps detected'),
+                ? toast.success(t('timeline.newGapsFound', { count: d.count }))
+                : toast.info(t('timeline.noNewGaps')),
           })
         }}
         scanning={detectGaps.isPending}
@@ -128,7 +131,7 @@ export function TimelineView() {
               row.kind === 'event' ? (
                 <EventCard key={`ev-${row.data.id}`} event={row.data} />
               ) : (
-                <GapCard key={`gap-${row.data.id}`} block={row.data} onResolve={() => setResolving(row.data)} />
+                <GapCard key={`gap-${row.data.id}`} block={row.data} onResolve={() => setResolving(row.data)} t={t} isAr={isAr} />
               ),
             )}
           </div>
@@ -167,7 +170,8 @@ function DaySummary({
   onAdd: () => void
   onVoiceCapture: () => void
 }) {
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
+  const isAr = locale === 'ar-EG'
   const hours = (trackedMinutes / 60).toFixed(1)
   const awakeMinutes = today
     ? Math.max(0, differenceInMinutes(new Date(), new Date(date.setHours(6, 0, 0, 0))))
@@ -196,11 +200,11 @@ function DaySummary({
               </h2>
               <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold text-white ${statusColor}`}>
                 <span className="h-1.5 w-1.5 rounded-full bg-white/90" />
-                {status === 'green' ? (t('timeline.complete')) : status === 'yellow' ? 'Partial' : 'Incomplete'}
+                {status === 'green' ? (t('timeline.complete')) : status === 'yellow' ? t('timeline.partial') : t('timeline.incomplete')}
               </span>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
-              {eventCount} event{eventCount === 1 ? '' : 's'} · {hours}h tracked · {completion}% of waking hours
+              {t(eventCount === 1 ? 'timeline.statsLine.one' : 'timeline.statsLine', { events: String(eventCount), hours, pct: String(completion) })}
             </p>
             <div className="mt-2 h-2 w-full max-w-xs overflow-hidden rounded-full bg-muted">
               <motion.div
@@ -250,7 +254,7 @@ function DaySummary({
   )
 }
 
-function GapCard({ block, onResolve }: { block: UnknownBlock; onResolve: () => void }) {
+function GapCard({ block, onResolve, t, isAr }: { block: UnknownBlock; onResolve: () => void; t: (key: TranslationKey, vars?: Record<string, string | number>) => string; isAr: boolean }) {
   const hours = (block.durationMinutes / 60).toFixed(1)
   const severityColor = {
     low: 'border-amber-500/30 bg-amber-500/5',
@@ -272,20 +276,21 @@ function GapCard({ block, onResolve }: { block: UnknownBlock; onResolve: () => v
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-amber-800 dark:text-amber-200">Unknown time</span>
+            <span className="text-sm font-semibold text-amber-800 dark:text-amber-200">{t('timeline.unknownTime')}</span>
             <span className="rounded-full bg-amber-500/15 px-1.5 py-0 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
-              {hours}h gap
+              {t('timeline.gapHours', { hours })}
             </span>
           </div>
           <p className="text-xs text-muted-foreground">
-            {format(new Date(block.startTime), 'h:mm a')} – {format(new Date(block.endTime), 'h:mm a')} ·{' '}
+              {isAr ? new Date(block.startTime).toLocaleTimeString('ar-EG', { hour: 'numeric', minute: '2-digit' }) : format(new Date(block.startTime), 'h:mm a')} –{' '}
+              {isAr ? new Date(block.endTime).toLocaleTimeString('ar-EG', { hour: 'numeric', minute: '2-digit' }) : format(new Date(block.endTime), 'h:mm a')} ·{' '}
             <button onClick={onResolve} className="font-medium text-emerald-600 hover:underline dark:text-emerald-400">
-              What happened?
+              {t('timeline.whatHappened')}
             </button>
           </p>
         </div>
         <Button variant="outline" className="h-11 border-amber-500/40 bg-background/50 px-4 hover:bg-amber-500/10" onClick={onResolve}>
-          <Sparkles className="mr-1.5 h-4 w-4" /> Resolve
+          <Sparkles className="mr-1.5 h-4 w-4" /> {t('timeline.resolve')}
         </Button>
       </div>
     </Card>
@@ -302,9 +307,9 @@ function EmptyTimeline({ onAdd }: { onAdd: () => void }) {
         </div>
         <div>
           <h3 className="text-lg font-semibold">{t('timeline.empty')}</h3>
-          <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-            Start logging your day. Every event you add helps the AI learn your patterns and fill future gaps.
-          </p>
+            <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+              {t('timeline.empty.desc2')}
+            </p>
         </div>
         <Button size="lg" onClick={onAdd} className="h-12 bg-emerald-600 px-6 hover:bg-emerald-700">
           <Plus className="mr-2 h-5 w-5" />

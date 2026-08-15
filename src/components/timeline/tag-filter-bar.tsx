@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Tag, X, Filter } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/hooks/use-translation'
 import type { TimelineEvent } from '@/lib/types'
 
 interface TagFilterBarProps {
@@ -13,6 +14,7 @@ interface TagFilterBarProps {
 }
 
 export function TagFilterBar({ events, selectedTag, onTagSelect }: TagFilterBarProps) {
+  const { t } = useTranslation()
   const [userExpanded, setUserExpanded] = useState(false)
 
   // Collect all unique tags from the day's events
@@ -46,10 +48,10 @@ export function TagFilterBar({ events, selectedTag, onTagSelect }: TagFilterBarP
             ? 'border-teal-500/40 bg-teal-500/10 text-teal-700 dark:text-teal-300'
             : 'border-border bg-card text-muted-foreground hover:bg-accent',
         )}
-        aria-label="Toggle tag filter"
+        aria-label={t('timeline.tagFilter')}
       >
         {selectedTag ? <Tag className="h-3 w-3" /> : <Filter className="h-3 w-3" />}
-        {selectedTag ? `#${selectedTag}` : 'Tags'}
+        {selectedTag ? `#${selectedTag}` : t('timeline.tags')}
         {selectedTag && <X className="h-2.5 w-2.5" />}
       </button>
 

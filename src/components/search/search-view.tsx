@@ -12,6 +12,7 @@ import { useAppStore } from '@/stores/app-store'
 import { format } from 'date-fns'
 import { Search, Sparkles, Clock, MapPin, ArrowRight, X } from 'lucide-react'
 import { formatTimeRange } from '@/components/timeline/event-form-dialog'
+import { useTranslation } from '@/hooks/use-translation'
 
 const EXAMPLE_QUERIES = [
   'When did I last exercise?',
@@ -20,12 +21,25 @@ const EXAMPLE_QUERIES = [
   'Time spent with friends',
   'My morning routine',
 ]
+const EXAMPLE_QUERIES_AR = [
+  'إمتى تمرّيت آخر مرة؟',
+  'اعرض جلسات المذاكرة بتاعتي',
+  'عملت إيه آخر ويك إند؟',
+  'الوقت اللي قضيته مع الأصدقاء',
+  'روتين الصبح بتاعي',
+]
+const MONTHS_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
 
 export function SearchView() {
   const [query, setQuery] = useState('')
   const [debounced, setDebounced] = useState('')
   const setSelectedDate = useAppStore((s) => s.setSelectedDate)
   const setView = useAppStore((s) => s.setView)
+  const { locale } = useTranslation()
+  const isAr = locale === 'ar-EG'
+  const tr = (en: string, ar: string) => isAr ? ar : en
+  const { t } = useTranslation()
+  const examples = isAr ? EXAMPLE_QUERIES_AR : EXAMPLE_QUERIES
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query), 400)
@@ -44,8 +58,8 @@ export function SearchView() {
               <Search className="h-4.5 w-4.5" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold">Semantic search</h2>
-              <p className="text-[11px] text-muted-foreground">Search by meaning, not just keywords</p>
+              <h2 className="text-sm font-semibold">{t('search.semanticTitle')}</h2>
+              <p className="text-[11px] text-muted-foreground">{t('search.semanticSubtitle')}</p>
             </div>
           </div>
           <div className="relative">
@@ -53,7 +67,7 @@ export function SearchView() {
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="e.g. When did I meet Ahmed? or Show my gym sessions"
+              placeholder={isAr ? 'مثلاً: امتى قابلت أحمد؟ أو اعرض تمارين الجيم بتاعتي' : 'e.g. When did I meet Ahmed? or Show my gym sessions'}
               className="h-11 pl-9 pr-9 text-sm"
               autoFocus
             />
@@ -61,7 +75,7 @@ export function SearchView() {
               <button
                 onClick={() => setQuery('')}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-accent"
-                aria-label="Clear search"
+                aria-label={t('search.clear')}
               >
                 <X className="h-4 w-4" />
               </button>
@@ -74,10 +88,10 @@ export function SearchView() {
       {!query && (
         <div className="space-y-2">
           <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            <Sparkles className="h-3 w-3" /> Try asking
+            <Sparkles className="h-3 w-3" /> {t('search.tryAsking')}
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
-            {EXAMPLE_QUERIES.map((q) => (
+            {examples.map((q) => (
               <button
                 key={q}
                 onClick={() => setQuery(q)}
@@ -97,11 +111,11 @@ export function SearchView() {
         <div className="space-y-2">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>
-              {isLoading ? 'Searching…' : `${results?.length ?? 0} match${(results?.length ?? 0) === 1 ? '' : 'es'}`}
+              {isLoading ? t('search.searching') : t('search.resultsCount', { count: results?.length ?? 0 })}
             </span>
             {results && results.length > 0 && (
               <span className="flex items-center gap-1">
-                <Sparkles className="h-3 w-3 text-emerald-500" /> Ranked by AI relevance
+                <Sparkles className="h-3 w-3 text-emerald-500" /> {t('search.ranked')}
               </span>
             )}
           </div>
@@ -117,9 +131,9 @@ export function SearchView() {
               <div className="flex flex-col items-center gap-2 text-center">
                 <Search className="h-8 w-8 text-muted-foreground" />
                 <div>
-                  <h3 className="text-sm font-semibold">No matches found</h3>
+                  <h3 className="text-sm font-semibold">{t('search.noMatches')}</h3>
                   <p className="mt-1 max-w-sm text-xs text-muted-foreground">
-                    Try rephrasing your query, or check if the event exists in your timeline within the last 90 days.
+                    {t('search.noMatchesHint')}
                   </p>
                 </div>
               </div>
@@ -136,6 +150,7 @@ export function SearchView() {
                 description={r.event.description}
                 score={r.score}
                 reason={r.reason}
+                isAr={isAr}
                 onOpen={() => {
                   setSelectedDate(r.event.startTime.slice(0, 10))
                   setView('timeline')
@@ -150,7 +165,7 @@ export function SearchView() {
 }
 
 function SearchResultCard({
-  title, startISO, endISO, category, location, description, score, reason, onOpen,
+  title, startISO, endISO, category, location, description, score, reason, onOpen, isAr,
 }: {
   title: string
   startISO: string
@@ -161,12 +176,13 @@ function SearchResultCard({
   score: number
   reason: string
   onOpen: () => void
+  isAr: boolean
 }) {
   return (
     <Card className="group cursor-pointer p-0 transition-shadow hover:shadow-md" onClick={onOpen}>
       <div className="flex items-stretch gap-3 p-3 pl-4">
         <div className="flex w-12 shrink-0 flex-col items-center justify-center rounded-lg bg-muted/50">
-          <span className="text-[9px] font-semibold uppercase text-muted-foreground">{format(new Date(startISO), 'MMM')}</span>
+          <span className="text-[9px] font-semibold uppercase text-muted-foreground">{isAr ? MONTHS_AR[new Date(startISO).getMonth()] : format(new Date(startISO), 'MMM')}</span>
           <span className="text-base font-bold leading-none">{format(new Date(startISO), 'd')}</span>
         </div>
         <div className="min-w-0 flex-1">

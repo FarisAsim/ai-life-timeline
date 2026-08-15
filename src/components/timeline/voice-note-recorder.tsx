@@ -6,6 +6,7 @@ import { useUploadAttachment } from '@/hooks/use-data'
 import { Mic, Square, Loader2, Play, Pause, X, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/hooks/use-translation'
 
 interface VoiceNoteRecorderProps {
   eventId: string
@@ -13,6 +14,8 @@ interface VoiceNoteRecorderProps {
 }
 
 export function VoiceNoteRecorder({ eventId, onDone }: VoiceNoteRecorderProps) {
+  const { locale, t } = useTranslation()
+  const isAr = locale === 'ar-EG'
   const [recording, setRecording] = useState(false)
   const [transcribing, setTranscribing] = useState(false)
   const [duration, setDuration] = useState(0)
@@ -40,7 +43,7 @@ export function VoiceNoteRecorder({ eventId, onDone }: VoiceNoteRecorderProps) {
             { eventId, file },
             {
               onSuccess: () => {
-                toast.success('Voice note attached')
+                toast.success(t('voice.attached'))
                 setTranscribing(false)
                 onDone?.()
               },
@@ -52,7 +55,7 @@ export function VoiceNoteRecorder({ eventId, onDone }: VoiceNoteRecorderProps) {
           )
         }
         reader.onerror = () => {
-          toast.error('Failed to read audio')
+          toast.error(t('voice.readFailed'))
           setTranscribing(false)
         }
         reader.readAsDataURL(blob)
@@ -65,7 +68,7 @@ export function VoiceNoteRecorder({ eventId, onDone }: VoiceNoteRecorderProps) {
         setDuration((d) => d + 1)
       }, 1000)
     } catch {
-      toast.error('Microphone access denied')
+      toast.error(t('voice.micDenied'))
     }
   }, [eventId, uploadMut, onDone])
 
@@ -88,7 +91,7 @@ export function VoiceNoteRecorder({ eventId, onDone }: VoiceNoteRecorderProps) {
     return (
       <div className="flex items-center gap-2 rounded-lg border border-violet-500/30 bg-violet-500/5 p-2 text-xs">
         <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-500" />
-        <span className="text-violet-700 dark:text-violet-300">Saving voice note…</span>
+        <span className="text-violet-700 dark:text-violet-300">{t('voice.saving')}</span>
       </div>
     )
   }
@@ -101,9 +104,9 @@ export function VoiceNoteRecorder({ eventId, onDone }: VoiceNoteRecorderProps) {
           <span className="relative inline-flex h-3 w-3 rounded-full bg-rose-500" />
         </span>
         <span className="font-mono text-xs font-semibold text-rose-700 dark:text-rose-300">{formatDuration(duration)}</span>
-        <span className="text-xs text-rose-600 dark:text-rose-400">Recording…</span>
+        <span className="text-xs text-rose-600 dark:text-rose-400">{t('voice.recording')}</span>
         <Button size="sm" variant="outline" className="ml-auto h-7 border-rose-500/40 text-rose-600" onClick={stopRecording}>
-          <Square className="mr-1 h-3 w-3" /> Stop
+          <Square className={isAr ? 'ml-1 h-3 w-3' : 'mr-1 h-3 w-3'} /> {t('voice.stop')}
         </Button>
       </div>
     )
@@ -116,13 +119,15 @@ export function VoiceNoteRecorder({ eventId, onDone }: VoiceNoteRecorderProps) {
       className="h-7 w-full border-violet-500/30 text-violet-700 dark:text-violet-300"
       onClick={startRecording}
     >
-      <Mic className="mr-1.5 h-3 w-3" /> Record voice note
+      <Mic className={isAr ? 'ml-1.5 h-3 w-3' : 'mr-1.5 h-3 w-3'} /> {t('voice.record')}
     </Button>
   )
 }
 
 // Audio player for existing voice note attachments
 export function VoiceNotePlayer({ attachmentId, filename, transcript: initialTranscript, onDelete }: { attachmentId: string; filename: string; transcript?: string | null; onDelete?: () => void }) {
+  const { locale, t } = useTranslation()
+  const isAr = locale === 'ar-EG'
   const [playing, setPlaying] = useState(false)
   const [transcript, setTranscript] = useState<string | null>(initialTranscript ?? null)
   const [transcribing, setTranscribing] = useState(false)
@@ -134,7 +139,7 @@ export function VoiceNotePlayer({ attachmentId, filename, transcript: initialTra
     if (playing) {
       audioRef.current.pause()
     } else {
-      audioRef.current.play().catch(() => toast.error('Could not play audio'))
+      audioRef.current.play().catch(() => toast.error(t('voice.playFailed')))
     }
     setPlaying(!playing)
   }
@@ -147,12 +152,12 @@ export function VoiceNotePlayer({ attachmentId, filename, transcript: initialTra
       if (j.transcript) {
         setTranscript(j.transcript)
         setShowTranscript(true)
-        toast.success('Transcript ready')
+        toast.success(t('voice.transcriptReady'))
       } else {
-        toast.error(j.error || 'Transcription failed')
+        toast.error(j.error || t('voice.transcribeFailed'))
       }
     } catch {
-      toast.error('Transcription failed')
+      toast.error(t('voice.transcribeFailed'))
     } finally {
       setTranscribing(false)
     }
@@ -164,21 +169,21 @@ export function VoiceNotePlayer({ attachmentId, filename, transcript: initialTra
         <button
           onClick={toggle}
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-violet-600 hover:bg-violet-500/25"
-          aria-label={playing ? 'Pause' : 'Play'}
+          aria-label={playing ? t('voice.pause') : t('voice.play')}
         >
           {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5 translate-x-0.5" />}
         </button>
         <div className="min-w-0 flex-1">
           <div className="truncate text-xs font-medium">{filename}</div>
-          <div className="text-[10px] text-muted-foreground">Voice note</div>
+          <div className="text-[10px] text-muted-foreground">{t('voice.label')}</div>
         </div>
         {transcript && (
           <button
             onClick={() => setShowTranscript((v) => !v)}
             className="rounded px-1.5 py-0.5 text-[10px] font-medium text-violet-600 hover:bg-violet-500/10"
-            title="Toggle transcript"
+            title={t('voice.toggleTranscript')}
           >
-            {showTranscript ? 'Hide' : 'Transcript'}
+            {showTranscript ? t('voice.hide') : t('voice.transcript')}
           </button>
         )}
         {!transcript && (
@@ -186,14 +191,14 @@ export function VoiceNotePlayer({ attachmentId, filename, transcript: initialTra
             onClick={transcribe}
             disabled={transcribing}
             className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-violet-600 hover:bg-violet-500/10 disabled:opacity-50"
-            title="Transcribe with AI"
+            title={t('voice.transcribeAi')}
           >
             {transcribing ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Sparkles className="h-2.5 w-2.5" />}
-            {transcribing ? '…' : 'Transcribe'}
+            {transcribing ? '…' : t('voice.transcribe')}
           </button>
         )}
         {onDelete && (
-          <button onClick={onDelete} className="text-rose-500 hover:text-rose-700" aria-label="Delete voice note">
+          <button onClick={onDelete} className="text-rose-500 hover:text-rose-700" aria-label={t('voice.delete')}>
             <X className="h-3 w-3" />
           </button>
         )}

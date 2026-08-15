@@ -4,12 +4,14 @@ import { Card } from '@/components/ui/card'
 import { Flame, Trophy } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/hooks/use-translation'
 
 interface StreakWidgetProps {
   streakDays: number
 }
 
 export function StreakWidget({ streakDays }: StreakWidgetProps) {
+  const { locale, t } = useTranslation()
   const isHot = streakDays >= 7
   const isWarm = streakDays >= 3 && streakDays < 7
 
@@ -34,13 +36,13 @@ export function StreakWidget({ streakDays }: StreakWidgetProps) {
           <div className="flex-1">
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold tracking-tight">{streakDays}</span>
-              <span className="text-xs text-muted-foreground">day streak</span>
+              <span className="text-xs text-muted-foreground">{t('insights.dayStreak')}</span>
             </div>
             <p className="text-[11px] text-muted-foreground">
-              {streakDays === 0 && "Log an event today to start your streak!"}
-              {streakDays === 1 && "Great start — keep it going tomorrow!"}
-              {streakDays >= 2 && streakDays < 7 && `${streakDays} days of consistent logging. Keep it up!`}
-              {streakDays >= 7 && `${streakDays} days! You're on fire! 🔥`}
+              {streakDays === 0 && t('insights.streakZero')}
+              {streakDays === 1 && t('insights.streakOne')}
+              {streakDays >= 2 && streakDays < 7 && t('insights.streakFew', { days: streakDays })}
+              {streakDays >= 7 && t('insights.streakFire', { days: streakDays })}
             </p>
           </div>
           {isHot && (

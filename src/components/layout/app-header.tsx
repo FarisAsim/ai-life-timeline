@@ -8,14 +8,14 @@ import { useNotifications, useRunNotificationEngine } from '@/hooks/use-data'
 import { toast } from 'sonner'
 import { useTranslation } from '@/hooks/use-translation'
 
-const VIEW_META: Record<string, { titleKey: string; subtitle: string }> = {
-  timeline: { titleKey: 'nav.timeline', subtitle: 'Hour-by-hour record of your day' },
-  calendar: { titleKey: 'nav.calendar', subtitle: 'Completion score across the month' },
-  unknown: { titleKey: 'unknown.title', subtitle: 'Gaps the AI wants to fill' },
-  companion: { titleKey: 'companion.title', subtitle: 'Chat grounded in your timeline' },
-  insights: { titleKey: 'insights.title', subtitle: 'Patterns and analytics' },
-  search: { titleKey: 'search.title', subtitle: 'Semantic search across events' },
-  settings: { titleKey: 'settings.title', subtitle: 'Profile, privacy, and data controls' },
+const VIEW_META: Record<string, { titleKey: string; subtitleKey: string }> = {
+  timeline: { titleKey: 'nav.timeline', subtitleKey: 'header.subTimeline' },
+  calendar: { titleKey: 'nav.calendar', subtitleKey: 'header.subCalendar' },
+  unknown: { titleKey: 'unknown.title', subtitleKey: 'header.subUnknown' },
+  companion: { titleKey: 'companion.title', subtitleKey: 'header.subCompanion' },
+  insights: { titleKey: 'insights.title', subtitleKey: 'header.subInsights' },
+  search: { titleKey: 'search.title', subtitleKey: 'header.subSearch' },
+  settings: { titleKey: 'settings.title', subtitleKey: 'header.subSettings' },
 }
 
 export function AppHeader() {
@@ -43,7 +43,7 @@ export function AppHeader() {
           <button
             className="flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground hover:bg-accent md:hidden"
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            aria-label="Open navigation menu"
+            aria-label={t('header.openNav')}
           >
             <Menu className="h-5 w-5" />
           </button>
@@ -52,7 +52,7 @@ export function AppHeader() {
               {t(meta.titleKey as never)}
             </h1>
             <p className="hidden truncate text-sm text-muted-foreground md:block">
-              {meta.subtitle}
+              {t(meta.subtitleKey as never)}
             </p>
           </div>
         </div>
@@ -69,26 +69,26 @@ export function AppHeader() {
             onClick={() => {
               runEngine.mutate(undefined, {
                 onSuccess: (d: { count?: number } | undefined) =>
-                  toast.success(d?.count ? `Generated ${d.count} notification${d.count === 1 ? '' : 's'}` : 'No new notifications'),
+                  toast.success(d?.count ? t('header.generated', { count: d.count }) : t('header.noNew')),
               })
             }}
             disabled={runEngine.isPending}
           >
             <Sparkles className="h-4 w-4" />
-            <span className="ml-1.5">Scan</span>
+            <span className="ml-1.5">{t('header.scan')}</span>
           </Button>
 
           {/* Notifications — always visible, 44px touch target */}
           <button
             className="relative flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground hover:bg-accent"
             onClick={() => setNotifPanelOpen(true)}
-            aria-label={`Notifications${unread > 0 ? `, ${unread} unread` : ''}`}
+            aria-label={unread > 0 ? t('header.notifsUnread', { n: unread }) : t('header.notifs')}
           >
             <Bell className="h-5 w-5" />
             {unread > 0 && (
               <span
                 className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-xs font-bold text-white"
-                aria-label={`${unread} unread notifications`}
+                aria-label={t('header.notifsUnread', { n: unread })}
               >
                 {unread > 9 ? '9+' : unread}
               </span>

@@ -260,7 +260,7 @@ export function useInsights(days = 30) {
   return useQuery({
     queryKey: ['insights', days, refreshTick],
     queryFn: async () => {
-      const r = await fetch(`/api/insights?days=${days}`)
+      const r = await fetch(`/api/insights?days=${days}&lang=${encodeURIComponent(navigator.language)}`)
       return r.json()
     },
   })

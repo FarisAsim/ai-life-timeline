@@ -14,6 +14,10 @@ import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { Loader2, Sparkles, Wand2, Check, HelpCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/hooks/use-translation'
+
+const MONTHS_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
+const DAYS_AR = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
 
 export function ResolutionDialog({
   block,
@@ -24,6 +28,28 @@ export function ResolutionDialog({
   open: boolean
   onOpenChange: (v: boolean) => void
 }) {
+  const { locale } = useTranslation()
+  const isAr = locale === 'ar-EG'
+  const { t } = useTranslation()
+  const arBlockDesc = (b: NonNullable<typeof block>) => {
+    const d0 = new Date(b.startTime)
+    if (isAr) {
+      return (
+        <>
+          حصل إيه بين{' '}
+          <span className="font-medium text-foreground">{`${DAYS_AR[d0.getDay()]}، ${b.startTime.slice(8, 10)} ${MONTHS_AR[d0.getMonth()]} ${format(d0, 'h:mm a')}`}</span>{' '}
+          و <span className="font-medium text-foreground">{format(new Date(b.endTime), 'h:mm a')}</span> ({b.durationMinutes / 60}س)؟
+        </>
+      )
+    }
+    return (
+      <>
+        What happened between{' '}
+        <span className="font-medium text-foreground">{format(d0, 'EEE MMM d, h:mm a')}</span>{' '}
+        and <span className="font-medium text-foreground">{format(new Date(b.endTime), 'h:mm a')}</span> ({(b.durationMinutes / 60).toFixed(1)}h)?
+      </>
+    )
+  }
   const formKey = `${open}-${block?.id ?? 'none'}`
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -33,13 +59,11 @@ export function ResolutionDialog({
             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/15 text-amber-600">
               <HelpCircle className="h-4 w-4" />
             </span>
-            Fill the gap
+            {t('resolution.title')}
           </DialogTitle>
           {block && (
             <DialogDescription>
-              What happened between{' '}
-              <span className="font-medium text-foreground">{format(new Date(block.startTime), 'EEE MMM d, h:mm a')}</span>{' '}
-              and <span className="font-medium text-foreground">{format(new Date(block.endTime), 'h:mm a')}</span> ({(block.durationMinutes / 60).toFixed(1)}h)?
+              {arBlockDesc(block)}
             </DialogDescription>
           )}
         </DialogHeader>
@@ -53,6 +77,7 @@ export function ResolutionDialog({
 
 function ResolutionBody({ block, onDone }: { block: UnknownBlock; onDone: () => void }) {
   const { data: categories } = useCategories()
+  const { t } = useTranslation()
   const aiGuess = useAiGuess()
   const resolveMut = useResolveBlock()
   const confirmUnknownMut = useConfirmUnknown()
@@ -75,7 +100,7 @@ function ResolutionBody({ block, onDone }: { block: UnknownBlock; onDone: () => 
         if (result.guess.categoryId) setCategoryId(result.guess.categoryId)
       }
     } catch {
-      toast.error('AI guess failed')
+      toast.error(t('resolution.guessFailed'))
     } finally {
       setGuessing(false)
     }
@@ -85,13 +110,13 @@ function ResolutionBody({ block, onDone }: { block: UnknownBlock; onDone: () => 
     if (guess) {
       setTitle(guess.title)
       if (guess.categoryId) setCategoryId(guess.categoryId)
-      toast.success('AI guess applied — review and confirm')
+      toast.success(t('resolution.guessApplied'))
     }
   }
 
   const resolve = async () => {
     if (!title.trim()) {
-      toast.error('Please enter a title')
+      toast.error(t('resolution.titleRequired'))
       return
     }
     try {
@@ -101,20 +126,20 @@ function ResolutionBody({ block, onDone }: { block: UnknownBlock; onDone: () => 
         categoryId: categoryId === 'none' ? null : categoryId,
         description: description.trim() || undefined,
       })
-      toast.success('Gap resolved — timeline updated')
+      toast.success(t('resolution.resolved'))
       onDone()
     } catch {
-      toast.error('Failed to resolve')
+      toast.error(t('resolution.failed'))
     }
   }
 
   const confirmUnknown = async () => {
     try {
       await confirmUnknownMut.mutateAsync(block.id)
-      toast.success("Marked as unknown — I'll stop asking about this time")
+      toast.success(t('resolution.markedUnknown'))
       onDone()
     } catch {
-      toast.error('Failed')
+      toast.error(t('resolution.failed'))
     }
   }
 
@@ -128,11 +153,11 @@ function ResolutionBody({ block, onDone }: { block: UnknownBlock; onDone: () => 
           <div className="mb-2 flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-xs font-medium text-violet-700 dark:text-violet-300">
               <Sparkles className="h-3.5 w-3.5" />
-              AI Guess
+              {t('resolution.aiGuess')}
             </div>
             <Button size="sm" variant="outline" className="h-7 border-violet-500/30 text-violet-700 dark:text-violet-300" onClick={runGuess} disabled={guessing}>
               {guessing ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Wand2 className="mr-1 h-3 w-3" />}
-              {guess ? 'Regenerate' : 'Ask AI'}
+              {guess ? t('resolution.regenerate') : t('resolution.askAi')}
             </Button>
           </div>
           {guess ? (
@@ -140,39 +165,39 @@ function ResolutionBody({ block, onDone }: { block: UnknownBlock; onDone: () => 
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium">{guess.title}</span>
                 <Badge variant="outline" className="text-[10px]">
-                  {Math.round(guess.confidence * 100)}% confident
+                  {t('resolution.confident', { pct: Math.round(guess.confidence * 100) })}
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground">{guess.reasoning}</p>
               <Button size="sm" variant="ghost" className="h-7 w-full" onClick={applyGuess}>
-                <Check className="mr-1 h-3 w-3" /> Use this guess
+                <Check className="mr-1 h-3 w-3" /> {t('resolution.useGuess')}
               </Button>
             </div>
           ) : (
             <p className="text-xs text-muted-foreground">
-              Let the AI analyze your recent patterns and propose what you were likely doing.
+              {t('resolution.guessHint')}
             </p>
           )}
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="r-title">What did you do?</Label>
+          <Label htmlFor="r-title">{t('resolution.whatDidYouDo')}</Label>
           <Input
             id="r-title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g. Met with the design team"
+            placeholder={t('resolution.whatDidYouDo.ph')}
             autoFocus
           />
         </div>
         <div className="grid gap-2">
-          <Label htmlFor="r-cat">Category</Label>
+          <Label htmlFor="r-cat">{t('resolution.category')}</Label>
           <Select value={categoryId} onValueChange={setCategoryId}>
             <SelectTrigger id="r-cat">
-              <SelectValue placeholder="Select category" />
+              <SelectValue placeholder={t('resolution.selectCategory')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">No category</SelectItem>
+              <SelectItem value="none">{t('resolution.noCategory')}</SelectItem>
               {categories?.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
                   {c.name}
@@ -182,22 +207,22 @@ function ResolutionBody({ block, onDone }: { block: UnknownBlock; onDone: () => 
           </Select>
         </div>
         <div className="grid gap-2">
-          <Label htmlFor="r-desc">Notes (optional)</Label>
-          <Textarea id="r-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="Any details about this time" />
+          <Label htmlFor="r-desc">{t('resolution.notes')}</Label>
+          <Textarea id="r-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder={t('resolution.notes.ph')} />
         </div>
       </div>
 
       <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
         <Button variant="ghost" onClick={confirmUnknown} disabled={pending} className="text-muted-foreground">
-          I genuinely don't recall
+          {t('resolution.dontRecall')}
         </Button>
         <div className="flex gap-2">
           <Button variant="outline" onClick={onDone} disabled={pending}>
-            Cancel
+            {t('resolution.cancel')}
           </Button>
           <Button onClick={resolve} disabled={pending} className="bg-emerald-600 hover:bg-emerald-700">
             {pending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
-            Resolve
+            {t('unknown.resolve')}
           </Button>
         </div>
       </DialogFooter>

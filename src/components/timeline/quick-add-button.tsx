@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useCategories, useCreateEvent, useInsights, useTemplates } from '@/hooks/use-data'
 import { toast } from 'sonner'
+import { useTranslation } from '@/hooks/use-translation'
 import { addMinutes } from 'date-fns'
 import { Zap, Plus, Briefcase, Dumbbell, Utensils, BookOpen, Moon, Coffee, Users, Heart, Car, History, Star, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -30,6 +31,7 @@ const TEMPLATES: Template[] = [
 ]
 
 export function QuickAddButton({ date }: { date: string }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const { data: categories } = useCategories()
   const { data: insights } = useInsights(30)
@@ -77,10 +79,10 @@ export function QuickAddButton({ date }: { date: string }) {
       },
       {
         onSuccess: () => {
-          toast.success(`${tpl.title} added (${tpl.durationMin}m)`)
+          toast.success(t('quickAdd.added', { title: tpl.title, min: String(tpl.durationMin) }))
           setOpen(false)
         },
-        onError: () => toast.error('Failed to add event'),
+        onError: () => toast.error(t('quickAdd.addFailed')),
       },
     )
   }
@@ -90,7 +92,7 @@ export function QuickAddButton({ date }: { date: string }) {
       <PopoverTrigger asChild>
         <Button size="sm" variant="outline" className="border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300">
           <Zap className="mr-1.5 h-3.5 w-3.5" />
-          Quick add
+          {t('quickAdd.button')}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-72 p-2" align="end">
@@ -99,7 +101,7 @@ export function QuickAddButton({ date }: { date: string }) {
           <>
             <div className="mb-1 flex items-center gap-1.5 px-2 text-[10px] font-semibold uppercase tracking-wide text-violet-600">
               <History className="h-3 w-3" />
-              Your frequent
+              {t('quickAdd.yourFrequent')}
             </div>
             <div className="grid grid-cols-1 gap-0.5">
               {frequentTemplates.map((tpl, i) => {
@@ -127,7 +129,7 @@ export function QuickAddButton({ date }: { date: string }) {
           <>
             <div className="mb-1 flex items-center gap-1.5 px-2 text-[10px] font-semibold uppercase tracking-wide text-amber-600">
               <Star className="h-3 w-3" />
-              Saved templates
+              {t('quickAdd.savedTemplates')}
             </div>
             <div className="grid grid-cols-1 gap-0.5">
               {customTemplates.map((tpl: { id: string; title: string; categoryId: string | null; category: { name: string; color: string } | null; durationMin: number }) => (
@@ -148,7 +150,7 @@ export function QuickAddButton({ date }: { date: string }) {
         )}
 
         <div className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Templates
+          {t('quickAdd.templates')}
         </div>
         <div className="grid grid-cols-1 gap-0.5">
           {TEMPLATES.map((tpl) => {
@@ -170,7 +172,7 @@ export function QuickAddButton({ date }: { date: string }) {
         </div>
         <div className="mt-1.5 border-t pt-1.5">
           <p className="px-2 text-[10px] text-muted-foreground">
-            Events are added starting now (or noon for other days). Edit after creation for custom times.
+            {t('quickAdd.hint')}
           </p>
         </div>
       </PopoverContent>

@@ -80,7 +80,7 @@ export function CompanionView() {
         setConversationId(id)
       }
     } catch {
-      toast.error('Failed to load conversation')
+      toast.error(t('companion.loadFailed'))
     } finally {
       setLoadingConv(false)
     }
@@ -116,8 +116,8 @@ export function CompanionView() {
                 label: 'Undo',
                 onClick: () => {
                   fetch(`/api/timeline/${result.actionResult!.eventId}`, { method: 'DELETE' })
-                    .then(() => toast.success('Event removed'))
-                    .catch(() => toast.error('Could not undo'))
+                    .then(() => toast.success(t('companion.eventRemoved')))
+                    .catch(() => toast.error(t('companion.undoFailed')))
                 },
               },
             })
@@ -135,7 +135,7 @@ export function CompanionView() {
         setMessages((m) => [...m, actionNote])
       }
     } catch {
-      toast.error('The companion could not respond. Please try again.')
+      toast.error(t('companion.noResponse'))
     }
   }
 
@@ -156,7 +156,7 @@ export function CompanionView() {
       mediaRecorderRef.current = recorder
       setRecording(true)
     } catch {
-      toast.error('Microphone access denied')
+      toast.error(t('companion.micDenied'))
     }
   }
 
@@ -180,13 +180,13 @@ export function CompanionView() {
         if (j.text) {
           setInput(j.text)
         } else {
-          toast.error('Could not transcribe audio')
+          toast.error(t('companion.transcribeError'))
         }
         setTranscribing(false)
       }
       reader.readAsDataURL(blob)
     } catch {
-      toast.error('Transcription failed')
+      toast.error(t('companion.transcribeFailed'))
       setTranscribing(false)
     }
   }
@@ -311,7 +311,7 @@ function WelcomeScreen({ onPick }: { onPick: (s: string) => void }) {
       <div>
         <h2 className="text-base font-semibold">{t('companion.welcome')}</h2>
         <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
-          I have access to your recent events and unresolved gaps. I never fabricate — if I don't know, I'll tell you and point to the gap.
+          {t('companion.welcome.desc')}
         </p>
       </div>
       <div className="grid w-full max-w-md gap-2">

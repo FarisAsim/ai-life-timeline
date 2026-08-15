@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/card'
 import { Tag, Hash } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/hooks/use-translation'
 
 interface TagBreakdownProps {
   tags: { tag: string; minutes: number; percentage: number; eventCount: number }[]
@@ -21,20 +22,21 @@ const TAG_COLORS = [
 ]
 
 export function TagBreakdown({ tags }: TagBreakdownProps) {
+  const { t } = useTranslation()
   if (tags.length === 0) {
     return (
       <Card className="p-5">
         <div className="mb-3 flex items-center gap-2">
           <Tag className="h-4 w-4 text-teal-600" />
-          <h3 className="text-sm font-semibold">Tag breakdown</h3>
-          <span className="text-[11px] text-muted-foreground">— time spent per tag</span>
+          <h3 className="text-sm font-semibold">{t('insights.tagBreakdown')}</h3>
+          <span className="text-[11px] text-muted-foreground">— {t('insights.tagTimeSpent')}</span>
         </div>
         <div className="flex flex-col items-center gap-2 py-6 text-center">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-teal-500/10">
             <Hash className="h-5 w-5 text-teal-500" />
           </div>
           <p className="text-xs text-muted-foreground">
-            No tagged events yet. Add tags like <span className="font-mono text-teal-600">#project-x</span> to your events to see time breakdowns by tag.
+            {t('insights.noTags')}
           </p>
         </div>
       </Card>
@@ -47,17 +49,17 @@ export function TagBreakdown({ tags }: TagBreakdownProps) {
     <Card className="p-5">
       <div className="mb-3 flex items-center gap-2">
         <Tag className="h-4 w-4 text-teal-600" />
-        <h3 className="text-sm font-semibold">Tag breakdown</h3>
-        <span className="text-[11px] text-muted-foreground">— time spent per tag (top {tags.length})</span>
+        <h3 className="text-sm font-semibold">{t('insights.tagBreakdown')}</h3>
+        <span className="text-[11px] text-muted-foreground">— {t('insights.tagTimeSpentTop', { n: tags.length })}</span>
       </div>
       <div className="space-y-2">
-        {tags.map((t, i) => {
-          const hours = (t.minutes / 60).toFixed(1)
-          const widthPct = (t.minutes / maxMinutes) * 100
+        {tags.map((tagItem, i) => {
+          const hours = (tagItem.minutes / 60).toFixed(1)
+          const widthPct = (tagItem.minutes / maxMinutes) * 100
           const color = TAG_COLORS[i % TAG_COLORS.length]
           return (
             <motion.div
-              key={t.tag}
+              key={tagItem.tag}
               initial={{ opacity: 0, x: -8 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.2, delay: i * 0.04 }}
@@ -65,8 +67,8 @@ export function TagBreakdown({ tags }: TagBreakdownProps) {
             >
               <div className="mb-1 flex items-center justify-between text-xs">
                 <span className="flex items-center gap-1.5 font-medium">
-                  <span className="text-teal-600">#{t.tag}</span>
-                  <span className="text-[10px] text-muted-foreground">{t.eventCount} event{t.eventCount === 1 ? '' : 's'}</span>
+                  <span className="text-teal-600">#{tagItem.tag}</span>
+                  <span className="text-[10px] text-muted-foreground">{t('insights.tagEvents', { n: tagItem.eventCount })}</span>
                 </span>
                 <span className="font-semibold">{hours}h</span>
               </div>

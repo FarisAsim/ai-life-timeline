@@ -3,7 +3,7 @@ import { getUserTimezone, getUserNow, formatInUserTz, wallClockDate } from './ti
 import { differenceInMinutes, format, subDays, startOfDay, endOfDay } from 'date-fns'
 import type { Category, InsightData } from '@/lib/types'
 
-export async function getInsights(userId: string, rangeDays = 30): Promise<InsightData> {
+export async function getInsights(userId: string, rangeDays = 30, lang?: string | null): Promise<InsightData> {
   // "Today" and day buckets are computed in the user's timezone
   const tz = await getUserTimezone(userId)
   const end = await getUserNow(userId)
@@ -146,7 +146,7 @@ export async function getInsights(userId: string, rangeDays = 30): Promise<Insig
   }
 
   // Weekly summary text
-  const weeklySummary = generateWeeklySummary(categoryBreakdown, completenessPercentage, totalTrackedMinutes)
+  const weeklySummary = generateWeeklySummary(categoryBreakdown, completenessPercentage, totalTrackedMinutes, lang)
 
   return {
     totalTrackedMinutes,
@@ -165,25 +165,44 @@ function formatInUserTzKey(date: Date, tz: string): string {
   return formatInUserTz(date, tz, { year: 'numeric', month: '2-digit', day: '2-digit' })
 }
 
+function isArabicLocale(lang?: string | null): boolean {
+  const l = ((lang ?? (typeof navigator !== 'undefined' ? navigator.language : '')).split(',')[0] ?? '').toLowerCase()
+  return l.startsWith('ar')
+}
+
 function generateWeeklySummary(
   breakdown: { category: Category | null; minutes: number; percentage: number }[],
   completeness: number,
   total: number,
+  lang?: string | null,
 ): string {
-  if (total === 0) return "No timeline data yet. Start logging events to see your weekly insights."
+  const ar = isArabicLocale(lang)
+  if (total === 0) return ar ? 'لسه مفيش بيانات على الخط الزمني. سجّل أحداثك عشان تشوف تحليلاتك.' : "No timeline data yet. Start logging events to see your weekly insights."
   const top = breakdown[0]
-  const topName = top?.category?.name ?? 'Uncategorized'
+  const topName = top?.category?.name ?? (ar ? 'بدون تصنيف' : 'Uncategorized')
   const topHours = Math.round((top?.minutes ?? 0) / 60)
   const totalHours = Math.round(total / 60)
   const parts: string[] = []
-  parts.push(`You tracked ${totalHours} hours over this period with ${completeness}% timeline completeness.`)
-  parts.push(`Your top category was ${topName} at ${topHours} hours.`)
-  if (completeness < 70) {
-    parts.push("There are notable gaps in your timeline — resolve Unknown Blocks to improve your insights accuracy.")
-  } else if (completeness >= 85) {
-    parts.push("Excellent coverage — your insights are highly representative of your actual time.")
+  if (ar) {
+    parts.push(`سجّلت ${totalHours} ساعة في الفترة دي بنسبة اكتمال ${completeness}% من خطك الزمني.`)
+    parts.push(`أكتر فئة كان ${topName} بـ ${topHours} ساعة.`)
+    if (completeness < 70) {
+      parts.push('فيه فجوات واضحة في خطك الزمني — حل الأوقات المجهولة عشان التحليلات تبقى أدق.')
+    } else if (completeness >= 85) {
+      parts.push('تغطية ممتازة — تحليلاتك بتعكس وقتك الفعلي بدقة عالية.')
+    } else {
+      parts.push('تغطية كويسة — حل شوية فجوات تانية هيخلّي التحليلات أدق.')
+    }
   } else {
-    parts.push("Decent coverage — resolving a few more gaps will sharpen these insights.")
+    parts.push(`You tracked ${totalHours} hours over this period with ${completeness}% timeline completeness.`)
+    parts.push(`Your top category was ${topName} at ${topHours} hours.`)
+    if (completeness < 70) {
+      parts.push("There are notable gaps in your timeline — resolve Unknown Blocks to improve your insights accuracy.")
+    } else if (completeness >= 85) {
+      parts.push("Excellent coverage — your insights are highly representative of your actual time.")
+    } else {
+      parts.push("Decent coverage — resolving a few more gaps will sharpen these insights.")
+    }
   }
   return parts.join(' ')
 }

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/hooks/use-translation'
 import { VoiceNoteRecorder, VoiceNotePlayer } from './voice-note-recorder'
 
 const CATEGORY_HEX: Record<string, string> = {
@@ -24,9 +25,14 @@ const CATEGORY_HEX: Record<string, string> = {
   cyan: '#06b6d4', teal: '#14b8a6',
 }
 
-function formatDuration(minutes: number): string {
+function formatDuration(minutes: number, isAr: boolean): string {
   const h = Math.floor(minutes / 60)
   const m = minutes % 60
+  if (isAr) {
+    if (h === 0) return `${m} دقيقة`
+    if (m === 0) return `${h}س`
+    return `${h}س ${m}د`
+  }
   if (h === 0) return `${m}m`
   if (m === 0) return `${h}h`
   return `${h}h ${m}m`
@@ -39,6 +45,8 @@ function formatBytes(bytes: number): string {
 }
 
 export function EventCard({ event }: { event: TimelineEvent }) {
+  const { locale, t } = useTranslation()
+  const isAr = locale === 'ar-EG'
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
   const [lightbox, setLightbox] = useState<string | null>(null)
@@ -62,8 +70,8 @@ export function EventCard({ event }: { event: TimelineEvent }) {
   const handleDelete = () => {
     setActionSheetOpen(false)
     deleteMut.mutate(event.id, {
-      onSuccess: () => toast.success('Event deleted'),
-      onError: () => toast.error('Failed to delete'),
+      onSuccess: () => toast.success(t('timeline.eventDeleted')),
+      onError: () => toast.error(t('timeline.deleteFailed')),
     })
   }
 
@@ -72,8 +80,8 @@ export function EventCard({ event }: { event: TimelineEvent }) {
     createTemplateMut.mutate(
       { title: event.title, categoryId: event.categoryId, durationMin: event.durationMinutes, description: event.description ?? undefined },
       {
-        onSuccess: () => toast.success(`"${event.title}" saved as template`),
-        onError: () => toast.error('Failed to save template'),
+        onSuccess: () => toast.success(t('event.savedTemplate', { title: event.title })),
+        onError: () => toast.error(t('event.saveTemplateFailed')),
       },
     )
   }
@@ -95,8 +103,8 @@ export function EventCard({ event }: { event: TimelineEvent }) {
         confidenceScore: 1.0,
       },
       {
-        onSuccess: () => toast.success(`"${event.title}" duplicated to now`),
-        onError: () => toast.error('Failed to duplicate event'),
+        onSuccess: () => toast.success(t('event.duplicated', { title: event.title })),
+        onError: () => toast.error(t('event.duplicateFailed')),
       },
     )
   }
@@ -123,7 +131,7 @@ export function EventCard({ event }: { event: TimelineEvent }) {
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-emerald-500/10 backdrop-blur-[1px]">
               <div className="flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white shadow-lg">
                 <Paperclip className="h-4 w-4" />
-                Drop photos to attach
+                {t('event.dropPhotos')}
               </div>
             </div>
           )}
@@ -154,10 +162,10 @@ export function EventCard({ event }: { event: TimelineEvent }) {
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                   <span className="flex items-center gap-1">
                     <Clock className="h-3.5 w-3.5" />
-                    {format(start, 'h:mm a')} – {format(new Date(event.endTime), 'h:mm a')}
+                    {isAr ? `${format(start, 'h:mm a')} – ${format(new Date(event.endTime), 'h:mm a')}` : `${format(start, 'h:mm a')} – ${format(new Date(event.endTime), 'h:mm a')}`}
                   </span>
-                  <span className="text-muted-foreground/60">·</span>
-                  <span>{formatDuration(event.durationMinutes)}</span>
+                  <span className="text-muted-foreground/60">{isAr ? '،' : '·'}</span>
+                  <span>{formatDuration(event.durationMinutes, isAr)}</span>
                   {event.location && (
                     <>
                       <span className="text-muted-foreground/60">·</span>
@@ -170,7 +178,7 @@ export function EventCard({ event }: { event: TimelineEvent }) {
                   <span className="text-muted-foreground/60">·</span>
                   <span className="flex items-center gap-1">
                     <span className={cn('inline-block h-2.5 w-2.5 rounded-full', color?.dot ?? 'bg-slate-300')} />
-                    {event.category?.name ?? 'Uncategorized'}
+                    {event.category?.name ?? t('settings.uncategorized')}
                   </span>
                 </div>
 
@@ -190,7 +198,7 @@ export function EventCard({ event }: { event: TimelineEvent }) {
               <button
                 onClick={() => setActionSheetOpen(true)}
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent"
-                aria-label="Event actions"
+                aria-label={t('event.actions')}
               >
                 <MoreHorizontal className="h-5 w-5" />
               </button>
@@ -225,9 +233,9 @@ export function EventCard({ event }: { event: TimelineEvent }) {
                               onClick={() => setLightbox(attachmentUrl(att.id))}
                             />
                             <button
-                              onClick={() => deleteAttMut.mutate(att.id, { onSuccess: () => toast.success('Photo removed') })}
+                              onClick={() => deleteAttMut.mutate(att.id, { onSuccess: () => toast.success(t('event.photoRemoved')) })}
                               className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-white opacity-0 transition-opacity group-hover/photo:opacity-100"
-                              aria-label="Delete photo"
+                              aria-label={t('event.deletePhoto')}
                             >
                               <X className="h-3 w-3" />
                             </button>
@@ -244,7 +252,7 @@ export function EventCard({ event }: { event: TimelineEvent }) {
                             attachmentId={att.id}
                             filename={att.filename}
                             transcript={att.transcript}
-                            onDelete={() => deleteAttMut.mutate(att.id, { onSuccess: () => toast.success('Voice note removed') })}
+                            onDelete={() => deleteAttMut.mutate(att.id, { onSuccess: () => toast.success(t('event.voiceRemoved')) })}
                           />
                         ))}
                       </div>
@@ -258,7 +266,7 @@ export function EventCard({ event }: { event: TimelineEvent }) {
                           <div key={att.id} className="flex items-center gap-2 rounded-lg border p-2">
                             <span className="flex-1 truncate text-sm">{att.filename}</span>
                             <span className="text-xs text-muted-foreground">{formatBytes(att.size)}</span>
-                            <button onClick={() => deleteAttMut.mutate(att.id, { onSuccess: () => toast.success('Removed') })} className="text-rose-500" aria-label="Delete">
+                            <button onClick={() => deleteAttMut.mutate(att.id, { onSuccess: () => toast.success(t('event.removed')) })} className="text-rose-500" aria-label={t('event.delete')}>
                               <X className="h-4 w-4" />
                             </button>
                           </div>
@@ -267,9 +275,9 @@ export function EventCard({ event }: { event: TimelineEvent }) {
                     )}
                     {/* Meta */}
                     <div className="flex items-center gap-3 pt-1 text-xs text-muted-foreground">
-                      <span>Confidence: {Math.round(event.confidenceScore * 100)}%</span>
+                      <span>{t('event.confidence')}: {Math.round(event.confidenceScore * 100)}%</span>
                       <span>·</span>
-                      <span>Source: {SOURCE_LABELS[event.source]}</span>
+                      <span>{t('event.sourceLabel')}: {SOURCE_LABELS[event.source]}</span>
                     </div>
                   </div>
                 </motion.div>
@@ -281,13 +289,13 @@ export function EventCard({ event }: { event: TimelineEvent }) {
               <button
                 onClick={() => setExpanded(!expanded)}
                 className="mt-2 flex h-9 w-full items-center justify-center gap-1 rounded-lg text-sm text-muted-foreground hover:bg-accent"
-                aria-label={expanded ? 'Hide details' : 'Show details'}
+                aria-label={expanded ? t('event.hideDetails') : t('event.showDetails')}
                 aria-expanded={expanded}
               >
                 <motion.span animate={{ rotate: expanded ? 0 : -90 }} transition={{ duration: 0.15 }}>
                   <ChevronDown className="h-4 w-4" />
                 </motion.span>
-                <span>{expanded ? 'Less' : 'More'}</span>
+                <span>{expanded ? t('event.less') : t('event.more')}</span>
               </button>
             )}
           </div>
@@ -304,7 +312,7 @@ export function EventCard({ event }: { event: TimelineEvent }) {
           const file = e.target.files?.[0]
           if (!file) return
           uploadMut.mutate({ eventId: event.id, file }, {
-            onSuccess: () => { toast.success('Photo attached'); setExpanded(true) },
+            onSuccess: () => { toast.success(t('event.photoAttached')); setExpanded(true) },
             onError: (err) => toast.error(err.message),
           })
           e.target.value = ''
@@ -317,10 +325,10 @@ export function EventCard({ event }: { event: TimelineEvent }) {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
           onClick={() => setLightbox(null)}
           role="dialog"
-          aria-label="Photo viewer"
+          aria-label={t('event.photoViewer')}
         >
           <img src={lightbox} alt="Attachment" className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain shadow-2xl" />
-          <button className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20" aria-label="Close">
+          <button className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20" aria-label={t("event.close")}>
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -339,28 +347,28 @@ export function EventCard({ event }: { event: TimelineEvent }) {
               className="flex h-12 w-full items-center gap-3 rounded-xl px-4 text-base font-medium hover:bg-accent"
             >
               <Pencil className="h-5 w-5 text-emerald-600" />
-              Edit event
+              {t('event.edit')}
             </button>
             <button
               onClick={() => { setActionSheetOpen(false); fileInputRef.current?.click() }}
               className="flex h-12 w-full items-center gap-3 rounded-xl px-4 text-base font-medium hover:bg-accent"
             >
               <Paperclip className="h-5 w-5 text-blue-600" />
-              Attach photo
+              {t('event.attachPhoto')}
             </button>
             <button
               onClick={handleDuplicate}
               className="flex h-12 w-full items-center gap-3 rounded-xl px-4 text-base font-medium hover:bg-accent"
             >
               <Copy className="h-5 w-5 text-violet-600" />
-              Duplicate to now
+              {t('event.duplicate')}
             </button>
             <button
               onClick={handleSaveAsTemplate}
               className="flex h-12 w-full items-center gap-3 rounded-xl px-4 text-base font-medium hover:bg-accent"
             >
               <Star className="h-5 w-5 text-amber-600" />
-              Save as template
+              {t('event.saveAsTemplate')}
             </button>
             <div className="my-1 border-t" />
             <button
@@ -368,7 +376,7 @@ export function EventCard({ event }: { event: TimelineEvent }) {
               className="flex h-12 w-full items-center gap-3 rounded-xl px-4 text-base font-medium text-rose-600 hover:bg-rose-500/10"
             >
               <Trash2 className="h-5 w-5" />
-              Delete event
+              {t('event.delete')}
             </button>
           </div>
           <SheetFooter className="p-2 pt-0">
@@ -376,7 +384,7 @@ export function EventCard({ event }: { event: TimelineEvent }) {
               onClick={() => setActionSheetOpen(false)}
               className="flex h-12 w-full items-center justify-center rounded-xl bg-muted text-base font-medium"
             >
-              Cancel
+              {t('event.cancel')}
             </button>
           </SheetFooter>
         </SheetContent>

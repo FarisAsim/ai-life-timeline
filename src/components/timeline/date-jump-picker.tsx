@@ -8,11 +8,21 @@ import { useAppStore } from '@/stores/app-store'
 import { CalendarRange, ChevronLeft, ChevronRight } from 'lucide-react'
 import { format, subDays, addDays, isToday } from 'date-fns'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/hooks/use-translation'
+
+const MONTHS_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
+const DAYS_AR = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
 
 export function DateJumpPicker() {
   const selectedDate = useAppStore((s) => s.selectedDate)
   const setSelectedDate = useAppStore((s) => s.setSelectedDate)
   const [open, setOpen] = useState(false)
+  const { locale, t } = useTranslation()
+  const isAr = locale === 'ar-EG'
+  const arFormat = (d: Date, full: boolean) => {
+    if (!isAr) return full ? format(d, 'EEEE, MMMM d, yyyy') : format(d, 'MMM d, yyyy')
+    return `${d.getDate()} ${MONTHS_AR[d.getMonth()]}${full ? `، ${d.getFullYear()}` : ` ${d.getFullYear()}`}`
+  }
 
   const date = new Date(selectedDate + 'T00:00:00')
   const today = isToday(date)
@@ -23,7 +33,7 @@ export function DateJumpPicker() {
 
   return (
     <div className="flex items-center gap-1 rounded-lg border bg-card p-0.5">
-      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goPrev} aria-label="Previous day">
+      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goPrev} aria-label={t('picker.prevDay')}>
         <ChevronLeft className="h-4 w-4" />
       </Button>
       <Popover open={open} onOpenChange={setOpen}>
@@ -34,7 +44,7 @@ export function DateJumpPicker() {
           >
             <CalendarRange className="h-3.5 w-3.5 text-muted-foreground" />
             <span className={today ? 'text-emerald-600 dark:text-emerald-400' : ''}>
-              {today ? 'Today' : format(date, 'MMM d, yyyy')}
+              {today ? t('picker.today') : arFormat(date, false)}
             </span>
           </button>
         </PopoverTrigger>
@@ -53,13 +63,13 @@ export function DateJumpPicker() {
           />
           <div className="flex items-center justify-between border-t p-2">
             <Button variant="ghost" size="sm" onClick={() => { goToday(); setOpen(false) }} className="text-xs">
-              Jump to today
+              {t('picker.jumpToday')}
             </Button>
-            <span className="text-[10px] text-muted-foreground">{format(date, 'EEEE')}</span>
+            <span className="text-[10px] text-muted-foreground">{isAr ? `${DAYS_AR[date.getDay()]}` : format(date, 'EEEE')}</span>
           </div>
         </PopoverContent>
       </Popover>
-      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goNext} aria-label="Next day" disabled={today}>
+      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goNext} aria-label={t('picker.nextDay')} disabled={today}>
         <ChevronRight className={cn('h-4 w-4', today && 'opacity-30')} />
       </Button>
     </div>

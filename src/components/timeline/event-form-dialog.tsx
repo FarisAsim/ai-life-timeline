@@ -12,6 +12,7 @@ import type { TimelineEvent } from '@/lib/types'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { Loader2, ChevronDown } from 'lucide-react'
+import { useTranslation } from '@/hooks/use-translation'
 
 function toLocalInput(d: Date) {
   const pad = (n: number) => String(n).padStart(2, '0')
@@ -34,13 +35,14 @@ export function EventFormDialog({
   // Keyed remount: when `open` toggles or the target event changes, the form
   // body re-initializes its state from props via useState initializers.
   const formKey = `${open}-${existing?.id ?? 'new'}-${defaultStart?.getTime() ?? 0}`
+  const { t } = useTranslation()
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{existing ? 'Edit event' : 'New timeline event'}</DialogTitle>
+          <DialogTitle>{existing ? t('event.edit') : t('event.new')}</DialogTitle>
           <DialogDescription>
-            {existing ? 'Update the details of this event.' : 'Add an activity to your timeline. The system will detect any new gaps.'}
+            {existing ? t('event.updateDesc') : t('event.newDesc')}
           </DialogDescription>
         </DialogHeader>
         {open && (
@@ -68,6 +70,8 @@ function EventFormBody({
   defaultEnd?: Date
   onDone: () => void
 }) {
+  const { t, locale } = useTranslation()
+  const isAr = locale === 'ar-EG'
   const { data: categories } = useCategories()
   const createMut = useCreateEvent()
   const updateMut = useUpdateEvent()
@@ -90,21 +94,21 @@ function EventFormBody({
 
   const submit = async () => {
     if (!title.trim()) {
-      toast.error('Title required')
+      toast.error(t('event.titleRequired'))
       return
     }
     if (!start) {
-      toast.error('Start time required')
+      toast.error(t('event.startRequired'))
       return
     }
     if (!end) {
-      toast.error('End time required — how long will this last?')
+      toast.error(t('event.endRequired'))
       return
     }
     const startDate = new Date(start)
     const endDate = new Date(end)
     if (endDate <= startDate) {
-      toast.error('End time must be after start time')
+      toast.error(t('event.endAfterStart'))
       return
     }
     try {
@@ -120,14 +124,14 @@ function EventFormBody({
       }
       if (isEdit && existing) {
         await updateMut.mutateAsync({ id: existing.id, ...payload })
-        toast.success('Event updated')
+        toast.success(t('timeline.eventUpdated'))
       } else {
         await createMut.mutateAsync(payload)
-        toast.success('Event created')
+        toast.success(t('timeline.eventCreated'))
       }
       onDone()
     } catch {
-      toast.error('Failed to save event')
+      toast.error(t('timeline.saveFailed'))
     }
   }
 
@@ -139,7 +143,7 @@ function EventFormBody({
           id="ev-title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder={isEdit ? 'Event title' : 'What are you doing now?'}
+          placeholder={isEdit ? t('event.titlePlaceholder') : t('event.whatNow')}
           autoFocus
           className="h-12 text-base"
           onKeyDown={(e) => {
@@ -153,22 +157,22 @@ function EventFormBody({
         {/* Quick time row - simple and mobile-friendly */}
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <Label htmlFor="ev-start" className="mb-1 block text-xs text-muted-foreground">Start</Label>
+            <Label htmlFor="ev-start" className="mb-1 block text-xs text-muted-foreground">{t('event.start')}</Label>
             <Input id="ev-start" type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} className="h-11" />
           </div>
           <div>
-            <Label htmlFor="ev-end" className="mb-1 block text-xs text-muted-foreground">End</Label>
+            <Label htmlFor="ev-end" className="mb-1 block text-xs text-muted-foreground">{t('event.end')}</Label>
             <Input id="ev-end" type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} className="h-11" />
           </div>
         </div>
 
         {/* Category - quick horizontal scroll on mobile */}
         <div>
-          <Label className="mb-1 block text-xs text-muted-foreground">Category</Label>
+          <Label className="mb-1 block text-xs text-muted-foreground">{t('settings.templateCategory')}</Label>
           <Select value={categoryId} onValueChange={setCategoryId}>
-            <SelectTrigger id="ev-cat" className="h-11"><SelectValue placeholder="Select category" /></SelectTrigger>
+            <SelectTrigger id="ev-cat" className="h-11"><SelectValue placeholder={t('settings.selectCategory')} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">No category</SelectItem>
+              <SelectItem value="none">{t('settings.noCategory')}</SelectItem>
               {categories?.map((c) => (
                 <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
               ))}
@@ -180,23 +184,23 @@ function EventFormBody({
         <details className="group">
           <summary className="flex h-9 cursor-pointer items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
             <ChevronDown className="h-3 w-3 transition-transform group-open:rotate-180" />
-            More details
+            {t('event.moreDetails')}
           </summary>
           <div className="mt-2 space-y-2">
-            <Input id="ev-loc" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location (optional)" className="h-11" />
-            <Textarea id="ev-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="Description (optional)" />
-            <Textarea id="ev-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Notes (optional)" />
-            <Input id="ev-tags" value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} placeholder="Tags: project-x, health" className="h-11" />
+            <Input id="ev-loc" value={location} onChange={(e) => setLocation(e.target.value)} placeholder={t('event.locPlaceholder')} className="h-11" />
+            <Textarea id="ev-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder={t('event.descPlaceholder')} />
+            <Textarea id="ev-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder={t('event.notesPlaceholder')} />
+            <Input id="ev-tags" value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} placeholder={t('event.tagsPlaceholder')} className="h-11" />
           </div>
         </details>
       </div>
       <DialogFooter>
         <Button variant="outline" onClick={onDone} disabled={pending} className="h-11">
-          Cancel
+          {t('event.cancel')}
         </Button>
         <Button onClick={submit} disabled={pending || !title.trim()} className="h-11 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700">
           {pending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
-          {isEdit ? 'Save' : 'Add'}
+          {isEdit ? t('event.save') : t('event.add')}
         </Button>
       </DialogFooter>
     </>

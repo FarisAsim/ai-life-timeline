@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 import { CATEGORY_COLOR_MAP, type TimelineEvent, type UnknownBlock } from '@/lib/types'
 import { Sunrise, Sun, Sunset, Moon, Clock } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from '@/hooks/use-translation'
 
 const CATEGORY_HEX: Record<string, string> = {
   emerald: '#10b981',
@@ -34,6 +35,8 @@ export function HourBar() {
   const setView = useAppStore((s) => s.setView)
   const { data: events, isLoading } = useTimelineDay()
   const { data: blocks } = useUnknownBlocks()
+  const { locale, t } = useTranslation()
+  const isAr = locale === 'ar-EG'
   const [hovered, setHovered] = useState<{ kind: 'event' | 'gap'; data: TimelineEvent | UnknownBlock } | null>(null)
 
   const day = new Date(selectedDate + 'T00:00:00')
@@ -90,7 +93,7 @@ export function HourBar() {
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-xs font-semibold">Day at a glance</span>
+          <span className="text-xs font-semibold">{t('timeline.dayAtAGlance')}</span>
           <span className="text-[10px] text-muted-foreground">
             · {format(day, 'MMM d')} · {DAY_START_HOUR}:00–{DAY_END_HOUR}:00
           </span>
@@ -98,11 +101,11 @@ export function HourBar() {
         <div className="flex items-center gap-2 text-[10px]">
           <span className="flex items-center gap-1">
             <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            {Math.round(trackedMin / 60 * 10) / 10}h tracked
+            {Math.round(trackedMin / 60 * 10) / 10}{isAr ? 'س' : 'h'} {t('timeline.tracked')}
           </span>
           <span className="flex items-center gap-1">
             <span className="h-2 w-2 rounded-sm border border-amber-400 bg-amber-500/20" />
-            {Math.round(gapMin / 60 * 10) / 10}h gaps
+            {Math.round(gapMin / 60 * 10) / 10}{isAr ? 'س' : 'h'} {t('unknown.gapsShort')}
           </span>
         </div>
       </div>
@@ -123,7 +126,7 @@ export function HourBar() {
         >
           {/* Time-of-day background gradient zones */}
           <div className="absolute inset-0 flex">
-            <div className="h-full bg-gradient-to-r from-indigo-500/5 to-transparent" style={{ width: `${(1 / DAY_SPAN) * 100}%` }} title="Dawn" />
+            <div className="h-full bg-gradient-to-r from-indigo-500/5 to-transparent" style={{ width: `${(1 / DAY_SPAN) * 100}%` }} title={t("hourBar.dawn")} />
             <div className="h-full flex-1 bg-gradient-to-r from-amber-500/5 via-transparent to-orange-500/5" />
           </div>
 
@@ -179,7 +182,7 @@ export function HourBar() {
             >
               <div className="absolute -top-0.5 -left-1 h-2 w-2 rounded-full bg-rose-500 shadow-sm" />
               <div className="absolute -bottom-3 -translate-x-1/2 whitespace-nowrap text-[8px] font-bold text-rose-600">
-                NOW
+                {t('hourBar.now')}
               </div>
             </div>
           )}
@@ -230,16 +233,18 @@ function EventTooltip({ event }: { event: TimelineEvent }) {
 }
 
 function GapTooltip({ block }: { block: UnknownBlock }) {
+  const { locale, t } = useTranslation()
+  const isAr = locale === 'ar-EG'
   return (
     <div className="flex items-center gap-2">
       <span className="flex h-2.5 w-2.5 shrink-0 items-center justify-center">
         <span className="h-2 w-2 rounded-sm border border-amber-500 bg-amber-500/30" />
       </span>
-      <span className="font-medium text-amber-700 dark:text-amber-300">Unknown time</span>
+      <span className="font-medium text-amber-700 dark:text-amber-300">{t('hourBar.unknownTime')}</span>
       <span className="text-muted-foreground">
         {format(new Date(block.startTime), 'h:mm a')}–{format(new Date(block.endTime), 'h:mm a')}
       </span>
-      <span className="text-muted-foreground">· {(block.durationMinutes / 60).toFixed(1)}h</span>
+      <span className="text-muted-foreground">{isAr ? '،' : '·'} {(block.durationMinutes / 60).toFixed(1)}{isAr ? 'س' : 'h'}</span>
     </div>
   )
 }

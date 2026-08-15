@@ -11,6 +11,7 @@ import { CategoryBadge, CategoryDot } from '@/components/category-icon'
 import { toast } from 'sonner'
 import { Plus, Trash2, Tag, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/hooks/use-translation'
 
 const COLOR_OPTIONS = Object.keys(CATEGORY_COLOR_MAP)
 
@@ -18,34 +19,35 @@ export function CategoryManager() {
   const { data: categories } = useCategories()
   const createMut = useCreateCategory()
   const deleteMut = useDeleteCategory()
+  const { t } = useTranslation()
 
   const [name, setName] = useState('')
   const [color, setColor] = useState('emerald')
 
   const handleCreate = () => {
     if (!name.trim()) {
-      toast.error('Category name is required')
+      toast.error(t('settings.nameRequired'))
       return
     }
     createMut.mutate(
       { name: name.trim(), color },
       {
         onSuccess: () => {
-          toast.success(`Category "${name}" created`)
+          toast.success(t('settings.categoryCreated', { name: name.trim() }))
           setName('')
         },
-        onError: () => toast.error('Failed to create category'),
+        onError: () => toast.error(t('settings.categoryCreateFailed')),
       },
     )
   }
 
   const handleDelete = (id: string, name: string, isDefault: boolean) => {
     if (isDefault) {
-      toast.error('Default categories cannot be deleted')
+      toast.error(t('settings.defaultCannotDelete'))
       return
     }
     deleteMut.mutate(id, {
-      onSuccess: () => toast.success(`Category "${name}" deleted`),
+      onSuccess: () => toast.success(t('settings.categoryDeleted', { name })),
       onError: (err) => toast.error(err.message),
     })
   }
@@ -57,8 +59,8 @@ export function CategoryManager() {
           <Tag className="h-4.5 w-4.5" />
         </div>
         <div>
-          <h3 className="text-sm font-semibold">Categories</h3>
-          <p className="text-xs text-muted-foreground">Customize how your activities are classified</p>
+          <h3 className="text-sm font-semibold">{t('settings.categories')}</h3>
+          <p className="text-xs text-muted-foreground">{t('settings.categories.subtitle')}</p>
         </div>
       </div>
 
@@ -72,14 +74,14 @@ export function CategoryManager() {
             <CategoryDot color={c.color} />
             <span className="flex-1 truncate text-xs font-medium">{c.name}</span>
             {c.isDefault && (
-              <span className="rounded bg-muted px-1 py-0.5 text-[9px] font-medium text-muted-foreground">default</span>
+              <span className="rounded bg-muted px-1 py-0.5 text-[9px] font-medium text-muted-foreground">{t('settings.defaultBadge')}</span>
             )}
             {!c.isDefault && (
               <button
                 onClick={() => handleDelete(c.id, c.name, c.isDefault)}
                 disabled={deleteMut.isPending}
                 className="text-rose-400 opacity-0 transition-opacity hover:text-rose-600 group-hover:opacity-100"
-                aria-label={`Delete ${c.name}`}
+                aria-label={t('settings.deleteCategoryAria', { name: c.name })}
               >
                 <Trash2 className="h-3 w-3" />
               </button>
@@ -91,22 +93,22 @@ export function CategoryManager() {
       {/* Create new category */}
       <div className="rounded-lg border border-dashed p-3">
         <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Create new category
+          {t('settings.createCategory')}
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
           <div className="grid flex-1 gap-1.5">
-            <Label htmlFor="cat-name" className="text-[11px]">Name</Label>
+            <Label htmlFor="cat-name" className="text-[11px]">{t('settings.categoryName')}</Label>
             <Input
               id="cat-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Reading, Family, Hobby"
+              placeholder={t('settings.categoryName.ph')}
               className="h-8 text-sm"
               onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
             />
           </div>
           <div className="grid gap-1.5">
-            <Label className="text-[11px]">Color</Label>
+            <Label className="text-[11px]">{t('settings.categoryColor')}</Label>
             <div className="flex flex-wrap gap-1">
               {COLOR_OPTIONS.map((c) => (
                 <button
@@ -117,7 +119,7 @@ export function CategoryManager() {
                     CATEGORY_COLOR_MAP[c]?.dot,
                     color === c ? 'ring-2 ring-offset-1 ring-foreground' : 'opacity-60 hover:opacity-100',
                   )}
-                  aria-label={`Color ${c}`}
+                  aria-label={t('settings.colorAria', { color: c })}
                 />
               ))}
             </div>
@@ -129,13 +131,13 @@ export function CategoryManager() {
             className="bg-emerald-600 hover:bg-emerald-700"
           >
             {createMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-            Add
+            {t('settings.add')}
           </Button>
         </div>
         {/* Preview */}
         {name.trim() && (
           <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground">
-            Preview: <CategoryBadge name={name.trim()} color={color} />
+            {t('settings.preview')}: <CategoryBadge name={name.trim()} color={color} />
           </div>
         )}
       </div>

@@ -17,8 +17,10 @@ import {
 import { format } from 'date-fns'
 import { TrendingUp, Clock, Target, Sparkles, PieChart as PieIcon, BarChart3, CalendarRange } from 'lucide-react'
 import type { InsightData } from '@/lib/types'
-import { CATEGORY_COLOR_MAP } from '@/lib/types'
+import { useTranslation } from '@/hooks/use-translation'
 
+const MONTHS_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
+const DAYS_AR = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
 const CATEGORY_HEX: Record<string, string> = {
   emerald: '#10b981',
   violet: '#8b5cf6',
@@ -35,6 +37,12 @@ const CATEGORY_HEX: Record<string, string> = {
 export function InsightsView() {
   const [range, setRange] = useState<7 | 30 | 90>(30)
   const { data, isLoading } = useInsights(range)
+  const { locale, t } = useTranslation()
+  const isAr = locale === 'ar-EG'
+  const arDate = (d: string) => {
+    const dt = new Date(d + 'T00:00:00')
+    return `${DAYS_AR[dt.getDay()]}، ${d.slice(8, 10)} ${MONTHS_AR[dt.getMonth()]}`
+  }
 
   if (isLoading || !data) {
     return (
@@ -58,8 +66,8 @@ export function InsightsView() {
       {/* Range selector */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-base font-semibold">Your timeline insights</h2>
-          <p className="text-xs text-muted-foreground">Patterns derived from {Math.round(data.totalTrackedMinutes / 60)}h of tracked time</p>
+          <h2 className="text-base font-semibold">{t('insights.title')}</h2>
+          <p className="text-xs text-muted-foreground">{t('insights.subtitle', { hours: Math.round(data.totalTrackedMinutes / 60) })}</p>
         </div>
         <Tabs value={String(range)} onValueChange={(v) => setRange(Number(v) as 7 | 30 | 90)}>
           <TabsList>
@@ -73,30 +81,30 @@ export function InsightsView() {
       {/* Top metrics */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
-          label="Completeness"
+          label={t('insights.completenessMetric')}
           value={`${data.completenessPercentage}%`}
-          subtitle="of waking hours"
+          subtitle={t('insights.wakingHours')}
           icon={Target}
           tone="emerald"
         />
         <MetricCard
-          label="Tracked time"
-          value={`${Math.round(data.totalTrackedMinutes / 60)}h`}
-          subtitle={`over ${range} days`}
+          label={t('insights.trackedTimeMetric')}
+          value={`${Math.round(data.totalTrackedMinutes / 60)}${isAr ? 'س' : 'h'}`}
+          subtitle={t('insights.overDays', { days: range })}
           icon={Clock}
           tone="violet"
         />
         <MetricCard
-          label="Top category"
+          label={t('insights.topCategoryMetric')}
           value={data.categoryBreakdown[0]?.category?.name ?? '—'}
-          subtitle={data.categoryBreakdown[0] ? `${Math.round(data.categoryBreakdown[0].percentage * 100)}% of time` : 'no data'}
+          subtitle={data.categoryBreakdown[0] ? t('insights.ofTime', { pct: Math.round(data.categoryBreakdown[0].percentage * 100) }) : t('insights.noData')}
           icon={PieIcon}
           tone="orange"
         />
         <MetricCard
-          label="Active days"
+          label={t('insights.activeDaysMetric')}
           value={String(data.dailyTotals.length)}
-          subtitle={`of ${range} days`}
+          subtitle={t('insights.ofRangeDays', { days: range })}
           icon={CalendarRange}
           tone="teal"
         />
@@ -112,7 +120,7 @@ export function InsightsView() {
             <Sparkles className="h-4.5 w-4.5" />
           </div>
           <div className="flex-1">
-            <div className="text-xs font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">AI summary</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">{t('insights.aiSummary')}</div>
             <p className="mt-1 text-sm leading-relaxed text-foreground/90">{data.weeklySummary}</p>
           </div>
         </div>
@@ -123,7 +131,7 @@ export function InsightsView() {
         <Card className="p-5">
           <div className="mb-3 flex items-center gap-2">
             <PieIcon className="h-4 w-4 text-emerald-600" />
-            <h3 className="text-sm font-semibold">Time by category</h3>
+            <h3 className="text-sm font-semibold">{t('insights.timeByCategory')}</h3>
           </div>
           <div className="flex flex-col items-center gap-4 sm:flex-row">
             <div className="h-44 w-44 shrink-0">
@@ -132,7 +140,7 @@ export function InsightsView() {
                   <Pie
                     data={data.categoryBreakdown.filter((c) => c.minutes > 0)}
                     dataKey="minutes"
-                    nameKey={(c: { category: { name: string } | null }) => c.category?.name ?? 'Uncategorized'}
+                    nameKey={(c: { category: { name: string } | null }) => c.category?.name ?? t('settings.uncategorized')}
                     cx="50%"
                     cy="50%"
                     innerRadius={45}
@@ -144,7 +152,7 @@ export function InsightsView() {
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(v: number) => [`${(v / 60).toFixed(1)}h`, 'Time']}
+                    formatter={(v: number) => [`${(v / 60).toFixed(1)}${isAr ? 'س' : 'h'}`, t('insights.tooltipTime')] as [string, string]}
                     contentStyle={{ borderRadius: '0.5rem', fontSize: '12px', border: '1px solid hsl(var(--border))' }}
                   />
                 </PieChart>
@@ -154,8 +162,8 @@ export function InsightsView() {
               {data.categoryBreakdown.slice(0, 7).map((c, i) => (
                 <div key={i} className="flex items-center gap-2 text-xs">
                   {c.category ? <CategoryDot color={c.category.color} /> : <span className="h-2.5 w-2.5 rounded-full bg-slate-400" />}
-                  <span className="flex-1 truncate">{c.category?.name ?? 'Uncategorized'}</span>
-                  <span className="font-medium">{(c.minutes / 60).toFixed(1)}h</span>
+                  <span className="flex-1 truncate">{c.category?.name ?? t('settings.uncategorized')}</span>
+                  <span className="font-medium">{(c.minutes / 60).toFixed(1)}{isAr ? 'س' : 'h'}</span>
                   <span className="w-9 text-right text-muted-foreground">{Math.round(c.percentage * 100)}%</span>
                 </div>
               ))}
@@ -167,7 +175,7 @@ export function InsightsView() {
         <Card className="p-5">
           <div className="mb-3 flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-orange-600" />
-            <h3 className="text-sm font-semibold">Productivity by hour</h3>
+            <h3 className="text-sm font-semibold">{t('insights.productivityByHour')}</h3>
           </div>
           <div className="h-44">
             <ResponsiveContainer width="100%" height="100%">
@@ -179,19 +187,19 @@ export function InsightsView() {
                   tick={{ fontSize: 10 }}
                   interval={1}
                 />
-                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${Math.round(v / 60)}h`} />
+                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${Math.round(v / 60)}${isAr ? 'س' : 'h'}`} />
                 <Tooltip
-                  formatter={(v: number, n: string) => [`${(Number(v) / 60).toFixed(1)}h`, n === 'score' ? 'Productive' : 'Total']}
+                  formatter={(v: number, n: string) => [`${(Number(v) / 60).toFixed(1)}${isAr ? 'س' : 'h'}`, n === 'score' ? t('insights.tooltipProductive') : t('insights.tooltipTotal')]}
                   labelFormatter={(h: number) => `${h}:00`}
                   contentStyle={{ borderRadius: '0.5rem', fontSize: '12px' }}
                 />
-                <Bar dataKey="minutes" name="Total" fill="#cbd5e1" radius={[3, 3, 0, 0]} />
-                <Bar dataKey="score" name="Productive" fill="#f97316" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="minutes" name={t('insights.tooltipTotal')} fill="#cbd5e1" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="score" name={t('insights.tooltipProductive')} fill="#f97316" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
           <p className="mt-2 text-[11px] text-muted-foreground">
-            Orange = productive categories (Work, Study, Exercise, Prayer, Personal). Bars show your most active hours.
+            {t('insights.orangeHint')}
           </p>
         </Card>
       </div>
@@ -200,7 +208,7 @@ export function InsightsView() {
       <Card className="p-5">
         <div className="mb-3 flex items-center gap-2">
           <BarChart3 className="h-4 w-4 text-teal-600" />
-          <h3 className="text-sm font-semibold">Daily tracked time</h3>
+          <h3 className="text-sm font-semibold">{t('insights.dailyTrackedTime')}</h3>
         </div>
         <div className="h-52">
           <ResponsiveContainer width="100%" height="100%">
@@ -208,14 +216,14 @@ export function InsightsView() {
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis
                 dataKey="date"
-                tickFormatter={(d: string) => format(new Date(d + 'T00:00:00'), 'MMM d')}
+                tickFormatter={(d: string) => (isAr ? `${d.slice(8, 10)} ${MONTHS_AR[new Date(d + 'T00:00:00').getMonth()]}` : format(new Date(d + 'T00:00:00'), 'MMM d'))}
                 tick={{ fontSize: 10 }}
                 interval={Math.max(0, Math.floor(data.dailyTotals.length / 8))}
               />
               <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${v}h`} />
               <Tooltip
-                formatter={(v: number) => [`${Number(v).toFixed(1)}h`, 'Tracked']}
-                labelFormatter={(d: string) => format(new Date(d + 'T00:00:00'), 'EEE, MMM d')}
+                formatter={(v: number) => [`${Number(v).toFixed(1)}${isAr ? 'س' : 'h'}`, t('insights.tooltipTracked')]}
+                labelFormatter={(d: string) => (isAr ? arDate(d) : format(new Date(d + 'T00:00:00'), 'EEE, MMM d'))}
                 contentStyle={{ borderRadius: '0.5rem', fontSize: '12px' }}
               />
               <Line type="monotone" dataKey="hours" stroke="#14b8a6" strokeWidth={2} dot={{ r: 3, fill: '#14b8a6' }} />
@@ -234,8 +242,8 @@ export function InsightsView() {
       <Card className="p-5">
         <div className="mb-3 flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-violet-600" />
-          <h3 className="text-sm font-semibold">Learned habits</h3>
-          <span className="text-[11px] text-muted-foreground">— your habit model, trained from confirmed events</span>
+          <h3 className="text-sm font-semibold">{t('insights.learnedHabits')}</h3>
+          <span className="text-[11px] text-muted-foreground">{t('insights.habitsDesc')}</span>
         </div>
         {data.topHabits.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-8 text-center">
@@ -243,7 +251,7 @@ export function InsightsView() {
               <Sparkles className="h-5 w-5 text-violet-500" />
             </div>
             <p className="text-xs text-muted-foreground">
-              No habits learned yet. Resolve a few Unknown Blocks and the AI will start recognizing your patterns.
+              {t('insights.noHabits')}
             </p>
           </div>
         ) : (
@@ -262,7 +270,7 @@ export function InsightsView() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-xs font-semibold capitalize">{label}</span>
-                      <span className="text-[10px] font-medium text-muted-foreground">{h.frequency}× seen</span>
+                      <span className="text-[10px] font-medium text-muted-foreground">{t('insights.timesSeen', { n: h.frequency })}</span>
                     </div>
                     <div className="mt-1.5 flex items-center gap-2">
                       <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
@@ -277,7 +285,7 @@ export function InsightsView() {
               )
             })}
             <p className="pt-1 text-center text-[10px] text-muted-foreground">
-              Higher confidence = the AI is more likely to suggest this pattern when filling future gaps.
+              {t('insights.habitsConfidence')}
             </p>
           </div>
         )}

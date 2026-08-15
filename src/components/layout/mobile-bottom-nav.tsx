@@ -34,7 +34,7 @@ export function MobileBottomNav() {
           paddingBottom: 'env(safe-area-inset-bottom)',
           height: 'calc(4rem + env(safe-area-inset-bottom))',
         }}
-        aria-label="Mobile navigation"
+        aria-label={t('nav.mobileNav')}
       >
         {/* Left items */}
         {navItems.slice(0, 2).map((item) => {
@@ -61,7 +61,7 @@ export function MobileBottomNav() {
         <button
           onClick={() => setVoiceOpen(true)}
           className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/40 transition-transform active:scale-90 pulse-glow"
-          aria-label="Record voice to add event"
+          aria-label={t('nav.recordVoice')}
         >
           <Mic className="h-6 w-6" aria-hidden="true" />
         </button>

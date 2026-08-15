@@ -10,6 +10,7 @@ import { Mic, Square, Loader2, Check, X, Sparkles, RefreshCw, Type, AlertCircle 
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useCategories, useCreateEvent } from '@/hooks/use-data'
+import { useTranslation } from '@/hooks/use-translation'
 
 interface VoiceCaptureDialogProps {
   open: boolean
@@ -38,6 +39,8 @@ export function VoiceCaptureDialog({ open, onOpenChange }: VoiceCaptureDialogPro
   const chunksRef = useRef<Blob[]>([])
   const { data: categories } = useCategories()
   const createMut = useCreateEvent()
+  const { t, locale } = useTranslation()
+  const isAr = locale === 'ar-EG'
 
   const startRecording = useCallback(async () => {
     setError(null)
@@ -70,15 +73,15 @@ export function VoiceCaptureDialog({ open, onOpenChange }: VoiceCaptureDialogPro
               setDetectedLanguage(j.detectedLanguage)
               setParsedEvent(j.event)
               setEditingTitle(j.event.title)
-              toast.success('Speech processed!')
+              toast.success(t('voice.capture.processed'))
             }
           } catch {
-            setError('Network error. Please try again or type manually.')
+            setError(t('companion.networkErrorType'))
             setMode('text')
           }
           setTranscribing(false)
         }
-        reader.onerror = () => { setError('Failed to read audio'); setTranscribing(false) }
+        reader.onerror = () => { setError(t('voice.capture.readFailed')); setTranscribing(false) }
         reader.readAsDataURL(blob)
       }
       recorder.start()
@@ -87,7 +90,7 @@ export function VoiceCaptureDialog({ open, onOpenChange }: VoiceCaptureDialogPro
       setTranscript('')
       setParsedEvent(null)
     } catch {
-      setError('Microphone access denied. Type instead below.')
+      setError(t('voice.capture.micDenied'))
       setMode('text')
     }
   }, [])
@@ -100,7 +103,7 @@ export function VoiceCaptureDialog({ open, onOpenChange }: VoiceCaptureDialogPro
   const processText = async () => {
     const text = textInput.trim()
     if (!text) {
-      setError('Please type something first')
+      setError(t('voice.capture.typeFirst'))
       return
     }
     setTranscribing(true)
@@ -119,10 +122,10 @@ export function VoiceCaptureDialog({ open, onOpenChange }: VoiceCaptureDialogPro
         setDetectedLanguage(j.detectedLanguage)
         setParsedEvent(j.event)
         setEditingTitle(j.event.title)
-        toast.success('Processed!')
+        toast.success(t('voice.capture.processed'))
       }
     } catch {
-      setError('Network error. Please try again.')
+      setError(t('companion.networkError'))
     }
     setTranscribing(false)
   }
@@ -144,10 +147,10 @@ export function VoiceCaptureDialog({ open, onOpenChange }: VoiceCaptureDialogPro
       },
       {
         onSuccess: () => {
-          toast.success('Event created!')
+          toast.success(t('voice.capture.eventCreated'))
           handleClose()
         },
-        onError: () => toast.error('Failed to create event'),
+        onError: () => toast.error(t('timeline.createFailed')),
       },
     )
   }
@@ -244,7 +247,7 @@ export function VoiceCaptureDialog({ open, onOpenChange }: VoiceCaptureDialogPro
                 </button>
               )}
               <p className="text-sm text-muted-foreground">
-                {recording ? '🔴 Recording… Tap to stop' : transcribing ? 'Processing…' : 'Tap to speak'}
+                {recording ? t('voice.capture.recordingLive') : transcribing ? t('voice.capture.processing') : t('voice.capture.tapToSpeak')}
               </p>
             </div>
           )}
@@ -253,18 +256,18 @@ export function VoiceCaptureDialog({ open, onOpenChange }: VoiceCaptureDialogPro
           {mode === 'text' && !parsedEvent && (
             <div className="space-y-3">
               <div className="grid gap-2">
-                <Label className="text-sm">What did you do?</Label>
+                <Label className="text-sm">{t('voice.capture.whatDidYouDo')}</Label>
                 <Input
                   value={textInput}
                   onChange={(e) => setTextInput(e.target.value)}
-                  placeholder="e.g. I just finished a 2 hour meeting with Ahmed"
+                  placeholder={t('voice.capture.placeholder')}
                   className="h-12"
                   onKeyDown={(e) => e.key === 'Enter' && processText()}
                 />
               </div>
               <Button onClick={processText} disabled={!textInput.trim() || transcribing} className="h-11 w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700">
                 {transcribing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                Parse with AI
+                {t('voice.capture.parseAi')}
               </Button>
             </div>
           )}
@@ -281,7 +284,7 @@ export function VoiceCaptureDialog({ open, onOpenChange }: VoiceCaptureDialogPro
           {transcript && (
             <div className="rounded-xl border border-violet-500/20 bg-gradient-to-br from-violet-500/5 to-transparent p-3">
               <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                <span>You said</span>
+                <span>{t('voice.capture.youSaid')}</span>
                 <span className="rounded-full bg-violet-500/10 px-2 py-0.5 text-violet-600">{langLabel}</span>
               </div>
               <p className="text-sm italic">"{transcript}"</p>
@@ -300,11 +303,11 @@ export function VoiceCaptureDialog({ open, onOpenChange }: VoiceCaptureDialogPro
                   <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500/15">
                     <Check className="h-3.5 w-3.5" />
                   </div>
-                  Detected Event
+                  {t('voice.capture.detectedEvent')}
                 </div>
                 <div className="grid gap-2">
                   <div className="grid gap-1">
-                    <Label className="text-xs text-muted-foreground">Title</Label>
+                    <Label className="text-xs text-muted-foreground">{t('event.title')}</Label>
                     <Input
                       value={editingTitle}
                       onChange={(e) => setEditingTitle(e.target.value)}
@@ -313,17 +316,17 @@ export function VoiceCaptureDialog({ open, onOpenChange }: VoiceCaptureDialogPro
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="rounded-lg bg-muted/50 p-2">
-                      <div className="text-xs text-muted-foreground">Start</div>
+                      <div className="text-xs text-muted-foreground">{t('event.start')}</div>
                       <div className="text-sm font-medium">{formatTime(parsedEvent.startTime)}</div>
                     </div>
                     <div className="rounded-lg bg-muted/50 p-2">
-                      <div className="text-xs text-muted-foreground">End</div>
+                      <div className="text-xs text-muted-foreground">{t('event.end')}</div>
                       <div className="text-sm font-medium">{formatTime(parsedEvent.endTime)}</div>
                     </div>
                   </div>
                   {parsedEvent.categoryName && (
                     <div className="rounded-lg bg-muted/50 p-2">
-                      <div className="text-xs text-muted-foreground">Category</div>
+                      <div className="text-xs text-muted-foreground">{t('settings.templateCategory')}</div>
                       <div className="text-sm font-medium">{parsedEvent.categoryName}</div>
                     </div>
                   )}
@@ -340,16 +343,16 @@ export function VoiceCaptureDialog({ open, onOpenChange }: VoiceCaptureDialogPro
               <>
                 <Button variant="outline" className="h-11 flex-1" onClick={() => { setParsedEvent(null); setTranscript(''); setTextInput(''); }}>
                   <RefreshCw className="mr-2 h-4 w-4" />
-                  Retry
+                  {t('voice.capture.tryAgain')}
                 </Button>
                 <Button className="h-11 flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700" onClick={confirmCreate} disabled={createMut.isPending}>
                   {createMut.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-                  Add Event
+                  {t('voice.capture.confirm')}
                 </Button>
               </>
             ) : (
               <Button variant="ghost" className="h-11 w-full" onClick={handleClose}>
-                Cancel
+                {t('event.cancel')}
               </Button>
             )}
           </div>

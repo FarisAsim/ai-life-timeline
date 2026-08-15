@@ -58,7 +58,7 @@ export function AppSidebar() {
           'sidebar-drawer fixed inset-y-0 left-0 z-50 h-screen flex w-80 max-w-[85vw] flex-col border-r bg-card/95 backdrop-blur-xl transition-transform duration-300 md:static md:z-0 md:block md:h-screen md:w-72 md:translate-x-0 md:bg-card',
           sidebarOpen ? 'flex translate-x-0' : 'sidebar-hidden hidden -translate-x-full md:flex',
         )}
-        aria-label="Navigation sidebar"
+        aria-label={t('nav.sidebar')}
         aria-hidden={!sidebarOpen}
       >
         {/* Brand */}
@@ -75,14 +75,14 @@ export function AppSidebar() {
           <button
             className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent md:hidden"
             onClick={() => setSidebarOpen(false)}
-            aria-label="Close menu"
+            aria-label={t('nav.closeMenu')}
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Nav — 44px minimum touch targets */}
-        <nav className="flex-1 overflow-y-auto p-3" aria-label="Main navigation">
+        <nav className="flex-1 overflow-y-auto p-3" aria-label={t('nav.mainNav')}>
           <div className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {t('nav.timeline' as never) === 'الخط الزمني' ? 'التنقل' : 'Navigate'}
           </div>
@@ -139,7 +139,7 @@ export function AppSidebar() {
                 ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
                 : 'text-foreground/70 hover:bg-accent hover:text-foreground',
             )}
-            aria-label="Open settings"
+            aria-label={t('nav.openSettings')}
           >
             <Settings className="h-4 w-4" aria-hidden="true" />
             {t('nav.settings')}

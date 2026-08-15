@@ -14,12 +14,15 @@ import type { UnknownBlock } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/hooks/use-translation'
 
+const MONTHS_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
+const DAYS_AR = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
+
 export function UnknownBlocksView() {
   const [tab, setTab] = useState<'open' | 'all'>('open')
   const { data: openBlocks, isLoading: openLoading } = useUnknownBlocks(false)
   const { data: allBlocks, isLoading: allLoading } = useUnknownBlocks(true)
   const [resolving, setResolving] = useState<UnknownBlock | null>(null)
-  const { locale } = useTranslation()
+  const { locale, t } = useTranslation()
   const isAr = locale === 'ar-EG'
   const tr = (en: string, ar: string) => isAr ? ar : en
 
@@ -47,7 +50,7 @@ export function UnknownBlocksView() {
           <div className="text-sm">
             <div className="font-semibold">{tr('The engine that protects "never lose a moment"', 'المحرك اللي بيحمي "ماتفوّتش لحظة"')}</div>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {tr('Every gap over 15 minutes becomes an Unknown Block. Resolve each one through text, AI Guess, or mark as unknown. Your answers train the AI.', 'كل فجوة فوق 15 دقيقة بتبقى Unknown Block. حل كل واحدة بالنص أو تخمين الذكاء الاصطناعي أو علمها كأنك مش فاكر. إجاباتك بتمرن الذكاء الاصطناعي.')}
+              {t('unknown.blockDesc')}
             </p>
           </div>
         </div>
@@ -117,19 +120,22 @@ function StatCard({ label, value, icon: Icon, tone }: { label: string; value: nu
 }
 
 function BlockRow({ block, onResolve }: { block: UnknownBlock; onResolve: () => void }) {
+  const { locale } = useTranslation()
+  const isAr = locale === 'ar-EG'
+  const { t } = useTranslation()
   const hours = (block.durationMinutes / 60).toFixed(1)
   const sevConfig = {
-    low: { color: 'text-amber-600', bg: 'bg-amber-500/10', label: 'Low' },
-    medium: { color: 'text-orange-600', bg: 'bg-orange-500/10', label: 'Medium' },
-    high: { color: 'text-rose-600', bg: 'bg-rose-500/10', label: 'High' },
+    low: { color: 'text-amber-600', bg: 'bg-amber-500/10', label: t('unknown.sevLow') },
+    medium: { color: 'text-orange-600', bg: 'bg-orange-500/10', label: t('unknown.sevMedium') },
+    high: { color: 'text-rose-600', bg: 'bg-rose-500/10', label: t('unknown.sevHigh') },
   }[block.severity]
 
   const statusConfig = {
-    open: { label: 'Open', tone: 'amber' as const, icon: Hourglass },
-    resolved: { label: 'Resolved', tone: 'emerald' as const, icon: CheckCircle2 },
-    ai_guessed_pending_confirmation: { label: 'AI Guess pending', tone: 'violet' as const, icon: Sparkles },
-    unknown_confirmed: { label: "Don't recall", tone: 'slate' as const, icon: HelpCircle },
-  }[block.status]
+    open: { label: t('unknown.statusOpen'), tone: 'amber' as const, icon: Hourglass },
+    resolved: { label: t('unknown.statusResolved'), tone: 'emerald' as const, icon: CheckCircle2 },
+    ai_guessed_pending_confirmation: { label: t('unknown.statusAiPending'), tone: 'violet' as const, icon: Sparkles },
+    unknown_confirmed: { label: t('unknown.statusDontRecall'), tone: 'slate' as const, icon: HelpCircle },
+  }[block.status] as { label: string; tone: 'amber' | 'emerald' | 'violet' | 'slate'; icon: typeof Hourglass }
   const StatusIcon = statusConfig.icon
   const isResolved = block.status !== 'open' && block.status !== 'ai_guessed_pending_confirmation'
 
@@ -142,13 +148,15 @@ function BlockRow({ block, onResolve }: { block: UnknownBlock; onResolve: () => 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-semibold">
-              {format(new Date(block.startTime), 'EEE, MMM d')}
+              {isAr
+                ? `${DAYS_AR[new Date(block.startTime).getDay()]}، ${block.startTime.slice(8, 10)} ${MONTHS_AR[new Date(block.startTime).getMonth()]}`
+                : format(new Date(block.startTime), 'EEE, MMM d')}
             </span>
             <span className="text-xs text-muted-foreground">
               {format(new Date(block.startTime), 'h:mm a')} – {format(new Date(block.endTime), 'h:mm a')}
             </span>
             <Badge variant="outline" className={cn('gap-1 text-[10px]', sevConfig.bg, sevConfig.color, 'border-current/20')}>
-              {sevConfig.label} · {hours}h
+              {sevConfig.label} · {hours}{isAr ? 'س' : 'h'}
             </Badge>
             <Badge variant="outline" className="gap-1 text-[10px]">
               <StatusIcon className="h-2.5 w-2.5" />
@@ -157,16 +165,16 @@ function BlockRow({ block, onResolve }: { block: UnknownBlock; onResolve: () => 
           </div>
           {block.resolvedEvent && (
             <p className="mt-1 truncate text-xs text-muted-foreground">
-              → Resolved as <span className="font-medium text-foreground">{block.resolvedEvent.title}</span>
+              {t('unknown.resolvedAs')} <span className="font-medium text-foreground">{block.resolvedEvent.title}</span>
             </p>
           )}
           {block.status === 'unknown_confirmed' && (
-            <p className="mt-1 text-xs italic text-muted-foreground">You confirmed you don't recall this time.</p>
+            <p className="mt-1 text-xs italic text-muted-foreground">{t('unknown.confirmed')}</p>
           )}
         </div>
         {!isResolved && (
           <Button size="sm" variant="outline" className="border-amber-500/40 hover:bg-amber-500/10" onClick={onResolve}>
-            <Sparkles className="mr-1 h-3 w-3" /> Resolve
+            <Sparkles className="mr-1 h-3 w-3" /> {t('unknown.resolve')}
           </Button>
         )}
       </div>

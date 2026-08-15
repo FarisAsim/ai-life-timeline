@@ -12,8 +12,13 @@ import { cn } from '@/lib/utils'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameMonth, isSameDay, isToday, getDay, startOfWeek, endOfWeek, addWeeks, subWeeks, startOfDay } from 'date-fns'
 import { ChevronLeft, ChevronRight, CalendarDays, CalendarRange } from 'lucide-react'
 import type { DayCompletion } from '@/lib/types'
+import { useTranslation } from '@/hooks/use-translation'
+import type { TranslationKey } from '@/lib/i18n/translations'
 
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const WEEKDAYS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const WEEKDAYS_AR = ['أحد', 'اثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة', 'سبت']
+const MONTHS_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
+const DAYS_AR = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
 
 export function CalendarView() {
   const [cursor, setCursor] = useState(new Date())
@@ -21,6 +26,11 @@ export function CalendarView() {
   const setSelectedDate = useAppStore((s) => s.setSelectedDate)
   const setView = useAppStore((s) => s.setView)
   const selectedDate = useAppStore((s) => s.selectedDate)
+  const { locale } = useTranslation()
+  const isAr = locale === 'ar-EG'
+  const tr = (en: string, ar: string) => isAr ? ar : en
+  const { t } = useTranslation()
+  const weekdays = isAr ? WEEKDAYS_AR : WEEKDAYS_EN
 
   const { data, isLoading } = useMonthCompletion(cursor.getFullYear(), cursor.getMonth())
 
@@ -53,31 +63,35 @@ export function CalendarView() {
             <div className="flex items-center gap-2">
               {viewMode === 'month' ? <CalendarDays className="h-4 w-4 text-emerald-600" /> : <CalendarRange className="h-4 w-4 text-emerald-600" />}
               <h2 className="text-lg font-semibold">
-                {viewMode === 'month' ? format(cursor, 'MMMM yyyy') : `Week of ${format(startOfWeek(cursor, { weekStartsOn: 0 }), 'MMM d')}`}
+                {viewMode === 'month'
+                  ? isAr
+                    ? `${MONTHS_AR[cursor.getMonth()]} ${cursor.getFullYear()}`
+                    : format(cursor, 'MMMM yyyy')
+                  : `${tr('Week of', 'أسبوع من')} ${isAr ? `${format(startOfWeek(cursor, { weekStartsOn: 0 }), 'd')} ${MONTHS_AR[startOfWeek(cursor, { weekStartsOn: 0 }).getMonth()]}` : format(startOfWeek(cursor, { weekStartsOn: 0 }), 'MMM d')}`}
               </h2>
             </div>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {viewMode === 'month'
-                ? <>Average completion: <span className="font-semibold text-foreground">{Math.round(monthScore * 100)}%</span> · {greenDays} green · {yellowDays} yellow · {redDays} red</>
-                : <>7-day completion overview · click any day to drill in</>
+                ? <>{t('calendar.avgCompletion')}: <span className="font-semibold text-foreground">{Math.round(monthScore * 100)}%</span> · {greenDays} {tr('green', 'أخضر')} · {yellowDays} {tr('yellow', 'أصفر')} · {redDays} {tr('red', 'أحمر')}</>
+                : <>{t('calendar.weekOverview')}</>
               }
             </p>
           </div>
           <div className="flex items-center gap-2">
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'month' | 'week')}>
               <TabsList className="h-8">
-                <TabsTrigger value="month" className="text-xs">Month</TabsTrigger>
-                <TabsTrigger value="week" className="text-xs">Week</TabsTrigger>
+                <TabsTrigger value="month" className="text-xs">{t('calendar.month')}</TabsTrigger>
+                <TabsTrigger value="week" className="text-xs">{t('calendar.week')}</TabsTrigger>
               </TabsList>
             </Tabs>
             <div className="flex items-center gap-1">
-              <Button variant="outline" size="icon" className="h-8 w-8 transition-transform hover:scale-105" onClick={() => setCursor(viewMode === 'month' ? subMonths(cursor, 1) : subWeeks(cursor, 1))} aria-label="Previous" title="Previous">
+              <Button variant="outline" size="icon" className="h-8 w-8 transition-transform hover:scale-105" onClick={() => setCursor(viewMode === 'month' ? subMonths(cursor, 1) : subWeeks(cursor, 1))} aria-label={t('calendar.previous')} title={t('calendar.previous')}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <Button variant="outline" size="sm" className="h-8" onClick={() => setCursor(new Date())}>
-                Today
+                {t('calendar.today')}
               </Button>
-              <Button variant="outline" size="icon" className="h-8 w-8 transition-transform hover:scale-105" onClick={() => setCursor(viewMode === 'month' ? addMonths(cursor, 1) : addWeeks(cursor, 1))} aria-label="Next" title="Next">
+              <Button variant="outline" size="icon" className="h-8 w-8 transition-transform hover:scale-105" onClick={() => setCursor(viewMode === 'month' ? addMonths(cursor, 1) : addWeeks(cursor, 1))} aria-label={t('calendar.next')} title={t('calendar.next')}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
@@ -87,15 +101,15 @@ export function CalendarView() {
         {/* Legend */}
         <div className="flex items-center gap-4 border-t bg-muted/30 px-5 py-2 text-[11px] text-muted-foreground">
           <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Complete (≥85%)
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> {t('calendar.legendComplete')}
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> Partial
+            <span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> {t('calendar.legendPartial')}
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-rose-500" /> Incomplete
+            <span className="h-2.5 w-2.5 rounded-full bg-rose-500" /> {t('calendar.legendIncomplete')}
           </span>
-          <span className="ml-auto hidden sm:inline">Click any day to view its timeline</span>
+          <span className="ml-auto hidden sm:inline">{t('calendar.clickDayHint')}</span>
         </div>
       </Card>
 
@@ -108,11 +122,11 @@ export function CalendarView() {
             ))}
           </div>
         ) : viewMode === 'week' ? (
-          <WeekView cursor={cursor} completionMap={completionMap} selectedDate={selectedDate} onSelect={(key) => { setSelectedDate(key); setView('timeline') }} />
+          <WeekView cursor={cursor} completionMap={completionMap} selectedDate={selectedDate} onSelect={(key) => { setSelectedDate(key); setView('timeline') }} weekdays={weekdays} t={t} isAr={isAr} />
         ) : (
           <>
             <div className="mb-2 grid grid-cols-7 gap-2">
-              {WEEKDAYS.map((d) => (
+              {weekdays.map((d) => (
                 <div key={d} className="text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                   {d}
                 </div>
@@ -195,6 +209,9 @@ function DayCell({ day, completion, isToday }: { day: Date; completion: DayCompl
 function SelectedDayDetail() {
   const selectedDate = useAppStore((s) => s.selectedDate)
   const [cursor] = useState(new Date())
+  const { locale } = useTranslation()
+  const isAr = locale === 'ar-EG'
+  const { t } = useTranslation()
   const { data } = useMonthCompletion(cursor.getFullYear(), cursor.getMonth())
   const completion = data?.days?.find((d) => d.date === selectedDate)
   if (!completion || completion.totalMinutes === 0) return null
@@ -204,23 +221,27 @@ function SelectedDayDetail() {
     <Card className="p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="text-xs text-muted-foreground">{format(new Date(selectedDate + 'T00:00:00'), 'EEEE, MMMM d')}</div>
+          <div className="text-xs text-muted-foreground">
+            {isAr
+              ? `${DAYS_AR[new Date(selectedDate + 'T00:00:00').getDay()]}, ${new Date(selectedDate + 'T00:00:00').getDate()} ${MONTHS_AR[new Date(selectedDate + 'T00:00:00').getMonth()]}`
+              : format(new Date(selectedDate + 'T00:00:00'), 'EEEE, MMMM d')}
+          </div>
           <div className="text-lg font-semibold">
-            {hours}h <span className="text-muted-foreground">of {possibleHours}h waking hours</span>
+            {hours}h <span className="text-muted-foreground">{t('calendar.hoursOfWaking', { hours: Number(possibleHours) })}</span>
           </div>
         </div>
         <div className="flex items-center gap-4 text-xs">
           <div className="text-center">
             <div className="text-lg font-bold text-foreground">{completion.eventCount}</div>
-            <div className="text-muted-foreground">events</div>
+            <div className="text-muted-foreground">{completion.eventCount === 1 ? t('calendar.eventsCount.one') : t('calendar.eventsCount')}</div>
           </div>
           <div className="text-center">
             <div className="text-lg font-bold text-amber-600">{completion.openBlockCount}</div>
-            <div className="text-muted-foreground">open gaps</div>
+            <div className="text-muted-foreground">{t('calendar.openGaps')}</div>
           </div>
           <div className="text-center">
             <div className="text-lg font-bold text-emerald-600">{Math.round(completion.score * 100)}%</div>
-            <div className="text-muted-foreground">complete</div>
+            <div className="text-muted-foreground">{t('calendar.completeN')}</div>
           </div>
         </div>
       </div>
@@ -228,20 +249,24 @@ function SelectedDayDetail() {
   )
 }
 
-function WeekView({ cursor, completionMap, selectedDate, onSelect }: {
+function WeekView({ cursor, completionMap, selectedDate, onSelect, weekdays, t, isAr }: {
   cursor: Date
   completionMap: Map<string, DayCompletion>
   selectedDate: string
   onSelect: (key: string) => void
+  weekdays: string[]
+  t: (key: TranslationKey, vars?: Record<string, string | number>) => string
+  isAr: boolean
 }) {
   const weekStart = startOfWeek(cursor, { weekStartsOn: 0 })
   const weekDays = eachDayOfInterval({ start: weekStart, end: new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000) })
   const now = new Date()
+  const tr = (en: string, ar: string) => isAr ? ar : en
 
   return (
     <div>
       <div className="mb-2 grid grid-cols-7 gap-2">
-        {WEEKDAYS.map((d) => (
+        {weekdays.map((d) => (
           <div key={d} className="text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
             {d}
           </div>
@@ -280,8 +305,10 @@ function WeekView({ cursor, completionMap, selectedDate, onSelect }: {
                     {Math.round(completion.score * 100)}%
                   </div>
                   <div className="text-[9px] text-muted-foreground">
-                    {completion.eventCount} ev
-                    {completion.openBlockCount > 0 && ` · ${completion.openBlockCount} gaps`}
+                    {isAr
+                      ? `${completion.eventCount} حدث${completion.eventCount === 1 ? '' : 'ات'}`
+                      : `${completion.eventCount} ev`}
+                    {completion.openBlockCount > 0 && ` · ${completion.openBlockCount} ${tr('gaps', 'فجوات')}`}
                   </div>
                   <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
                     <div className={cn('h-full rounded-full', barColor)} style={{ width: `${Math.round(completion.score * 100)}%` }} />
@@ -289,7 +316,7 @@ function WeekView({ cursor, completionMap, selectedDate, onSelect }: {
                 </div>
               ) : (
                 <div className="mt-1.5 flex-1 text-[9px] text-muted-foreground">
-                  {future ? 'Upcoming' : 'No data'}
+                  {future ? t('calendar.upcoming') : t('calendar.noData')}
                 </div>
               )}
             </button>

@@ -6,6 +6,7 @@ export async function GET(req: NextRequest) {
   const user = await getDemoUser()
   const rangeParam = req.nextUrl.searchParams.get('days')
   const days = rangeParam ? parseInt(rangeParam) : 30
-  const insights = await getInsights(user.id, days)
+  const lang = req.nextUrl.searchParams.get('lang')
+  const insights = await getInsights(user.id, days, lang)
   return NextResponse.json(insights)
 }

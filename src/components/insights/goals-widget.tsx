@@ -13,8 +13,11 @@ import { Target, Plus, Trash2, TrendingUp, CheckCircle2, Loader2 } from 'lucide-
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { CategoryDot } from '@/components/category-icon'
+import { useTranslation } from '@/hooks/use-translation'
 
 export function GoalsWidget() {
+  const { t, locale } = useTranslation()
+  const isAr = locale === 'ar-EG'
   const { data: goals, isLoading } = useGoals()
   const { data: categories } = useCategories()
   const createMut = useCreateGoal()
@@ -31,7 +34,7 @@ export function GoalsWidget() {
 
   const handleCreate = () => {
     if (!title.trim()) {
-      toast.error('Goal title is required')
+      toast.error(t('goals.titleRequired'))
       return
     }
     createMut.mutate(
@@ -45,17 +48,22 @@ export function GoalsWidget() {
       },
       {
         onSuccess: () => {
-          toast.success('Goal created')
+          toast.success(t('goals.created'))
           setTitle('')
           setTag('')
           setOpen(false)
         },
-        onError: () => toast.error('Failed to create goal'),
+        onError: () => toast.error(t('goals.createFailed')),
       },
     )
   }
 
-  const typeLabels: Record<string, string> = {
+  const typeLabels: Record<string, string> = isAr ? {
+    category_hours: 'ساعات من',
+    event_count: 'أحداث',
+    completion_pct: '% إكمال',
+    tag_hours: 'ساعات على وسم',
+  } : {
     category_hours: 'hours of',
     event_count: 'events',
     completion_pct: '% completion',
@@ -63,7 +71,7 @@ export function GoalsWidget() {
   }
 
   if (isLoading) {
-    return <Card className="p-5"><div className="animate-pulse text-xs text-muted-foreground">Loading goals…</div></Card>
+    return <Card className="p-5"><div className="animate-pulse text-xs text-muted-foreground">{t('goals.loading')}</div></Card>
   }
 
   return (
@@ -71,55 +79,55 @@ export function GoalsWidget() {
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Target className="h-4 w-4 text-emerald-600" />
-          <h3 className="text-sm font-semibold">Goals</h3>
-          <span className="text-[11px] text-muted-foreground">— track your weekly/monthly targets</span>
+          <h3 className="text-sm font-semibold">{t('goals.title')}</h3>
+          <span className="text-[11px] text-muted-foreground">— {t('goals.sub')}</span>
         </div>
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
             <Button size="sm" variant="outline" className="h-7">
-              <Plus className="mr-1 h-3 w-3" /> New goal
+              <Plus className={isAr ? 'ml-1 h-3 w-3' : 'mr-1 h-3 w-3'} /> {t('goals.new')}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-80 p-3" align="end">
             <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Create goal
+              {t('goals.createGoal')}
             </div>
             <div className="space-y-2">
               <div className="grid gap-1">
-                <Label htmlFor="goal-title" className="text-[11px]">Title</Label>
-                <Input id="goal-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Exercise 5x per week" className="h-8 text-sm" />
+                <Label htmlFor="goal-title" className="text-[11px]">{t('settings.title')}</Label>
+                <Input id="goal-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('goals.titlePlaceholder')} className="h-8 text-sm" />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="grid gap-1">
-                  <Label className="text-[11px]">Type</Label>
+                  <Label className="text-[11px]">{t('goals.type')}</Label>
                   <Select value={type} onValueChange={(v) => setType(v as typeof type)}>
                     <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="category_hours">Category hours</SelectItem>
-                      <SelectItem value="event_count">Event count</SelectItem>
-                      <SelectItem value="completion_pct">Completion %</SelectItem>
-                      <SelectItem value="tag_hours">Tag hours</SelectItem>
+                      <SelectItem value="category_hours">{t('goals.catHours')}</SelectItem>
+                      <SelectItem value="event_count">{t('goals.eventCount')}</SelectItem>
+                      <SelectItem value="completion_pct">{t('goals.completionPct')}</SelectItem>
+                      <SelectItem value="tag_hours">{t('goals.tagHours')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="grid gap-1">
-                  <Label className="text-[11px]">Period</Label>
+                  <Label className="text-[11px]">{t('goals.period')}</Label>
                   <Select value={period} onValueChange={(v) => setPeriod(v as typeof period)}>
                     <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="weekly">Weekly</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="weekly">{t('goals.weekly')}</SelectItem>
+                      <SelectItem value="monthly">{t('goals.monthly')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               {type === 'category_hours' && (
                 <div className="grid gap-1">
-                  <Label className="text-[11px]">Category</Label>
+                  <Label className="text-[11px]">{t('settings.templateCategory')}</Label>
                   <Select value={categoryId} onValueChange={setCategoryId}>
                     <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Any category</SelectItem>
+                      <SelectItem value="none">{t('goals.anyCategory')}</SelectItem>
                       {categories?.map((c) => (
                         <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                       ))}
@@ -129,12 +137,12 @@ export function GoalsWidget() {
               )}
               {type === 'tag_hours' && (
                 <div className="grid gap-1">
-                  <Label htmlFor="goal-tag" className="text-[11px]">Tag (without #)</Label>
+                  <Label htmlFor="goal-tag" className="text-[11px]">{t('goals.tagLabel')}</Label>
                   <Input
                     id="goal-tag"
                     value={tag}
                     onChange={(e) => setTag(e.target.value)}
-                    placeholder="e.g. project-x, health"
+                    placeholder={t('goals.tagPlaceholder')}
                     className="h-8 text-sm"
                   />
                 </div>
@@ -147,7 +155,7 @@ export function GoalsWidget() {
               )}
               <Button size="sm" onClick={handleCreate} disabled={createMut.isPending} className="w-full bg-emerald-600 hover:bg-emerald-700">
                 {createMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-                Create goal
+                {t('goals.createGoal')}
               </Button>
             </div>
           </PopoverContent>
@@ -160,7 +168,7 @@ export function GoalsWidget() {
             <Target className="h-5 w-5 text-emerald-500" />
           </div>
           <p className="text-xs text-muted-foreground">
-            No goals yet. Set a target like "Exercise 5x per week" to track your progress.
+            {t('goals.empty')}
           </p>
         </div>
       ) : (
@@ -196,9 +204,9 @@ export function GoalsWidget() {
                     </div>
                   </div>
                   <button
-                    onClick={() => deleteMut.mutate(goal.id, { onSuccess: () => toast.success('Goal deleted') })}
+                    onClick={() => deleteMut.mutate(goal.id, { onSuccess: () => toast.success(t('goals.deleted')) })}
                     className="text-rose-400 opacity-0 transition-opacity hover:text-rose-600 group-hover:opacity-100"
-                    aria-label="Delete goal"
+                    aria-label={t('goals.delete')}
                   >
                     <Trash2 className="h-3 w-3" />
                   </button>
