@@ -22,6 +22,12 @@ export interface AIConfig {
   sttModel: string
   geminiApiKey: string
   geminiModel: string
+  /**
+   * Fallback Gemini models tried automatically when the primary model hits
+   * a persistent quota (429). Each model has its own free-tier quota counter,
+   * so rotating gives effectively multiple quotas for free.
+   */
+  geminiFallbackModels: string[]
 }
 
 const DEFAULTS: AIConfig = {
@@ -32,6 +38,9 @@ const DEFAULTS: AIConfig = {
   sttModel: process.env.AI_STT_MODEL ?? 'gpt-4o-transcribe',
   geminiApiKey: process.env.GEMINI_API_KEY ?? '',
   geminiModel: process.env.GEMINI_MODEL ?? 'gemini-3.6-flash',
+  geminiFallbackModels: process.env.GEMINI_FALLBACK_MODELS
+    ? process.env.GEMINI_FALLBACK_MODELS.split(',')
+    : ['gemini-3.5-flash', 'gemini-3.7-flash'],
 }
 
 // In-memory cache of the persisted file config
@@ -51,6 +60,7 @@ function loadFileConfig(): AIConfig {
           sttModel: raw.sttModel ?? DEFAULTS.sttModel,
           geminiApiKey: raw.geminiApiKey ?? '',
           geminiModel: raw.geminiModel ?? DEFAULTS.geminiModel,
+          geminiFallbackModels: raw.geminiFallbackModels ?? DEFAULTS.geminiFallbackModels,
         }
       }
     } catch {
@@ -73,6 +83,7 @@ export function getAIConfig(): AIConfig & { configured: boolean } {
     sttModel: cfg.sttModel,
     geminiApiKey: cfg.geminiApiKey,
     geminiModel: cfg.geminiModel,
+    geminiFallbackModels: cfg.geminiFallbackModels,
     configured: apiKey.length > 0,
   }
 }
@@ -87,6 +98,7 @@ export function updateAIConfig(input: Partial<AIConfig>): AIConfig {
     sttModel: input.sttModel ?? DEFAULTS.sttModel,
     geminiApiKey: input.geminiApiKey ?? current.geminiApiKey,
     geminiModel: input.geminiModel ?? DEFAULTS.geminiModel,
+    geminiFallbackModels: input.geminiFallbackModels ?? current.geminiFallbackModels,
   }
   // Persist to the local JSON file
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2), 'utf-8')

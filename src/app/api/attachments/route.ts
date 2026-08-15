@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDemoUser } from '@/lib/services/demo-user'
+import { resolveUser } from '@/lib/api-account'
 import { addAttachment } from '@/lib/services/timeline-service'
 
 // Upload an attachment (base64-encoded) for an event
 export async function POST(req: NextRequest) {
-  const user = await getDemoUser()
+  const user = await resolveUser(req)
   const body = await req.json()
   const { eventId, filename, mimeType, data } = body as { eventId?: string; filename?: string; mimeType?: string; data?: string }
   if (!eventId || !filename || !mimeType || !data) {

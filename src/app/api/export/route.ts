@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDemoUser } from '@/lib/services/demo-user'
+import { resolveUser } from '@/lib/api-account'
 import { db } from '@/lib/db'
 import { format } from 'date-fns'
 
 // Data export — right to be informed / portability (PRD §9)
 // Supports JSON (full) and CSV (events only) via ?format=csv
 export async function GET(req: NextRequest) {
-  const user = await getDemoUser()
+  const user = await resolveUser(req)
   const formatParam = req.nextUrl.searchParams.get('format') ?? 'json'
 
   const [events, blocks, categories, conversations, notifications, habits] = await Promise.all([

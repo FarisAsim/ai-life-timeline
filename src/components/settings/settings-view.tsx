@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { apiFetch } from '@/hooks/use-data'
 import { useSettings, useUpdateSettings, useDeleteAccount, useSeed } from '@/hooks/use-data'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -9,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
 import { CategoryManager } from './category-manager'
+import { AccountSwitcher } from '@/components/account/account-switcher'
 import { TemplateManager } from './template-manager'
 import {
   AlertDialog,
@@ -23,7 +25,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import {
-  User, Clock, Download, Trash2, Database, Shield, Sparkles, Loader2, Check, Globe, Bell, FileText, Sun, Moon, Languages, AlertCircle,
+  User, Clock, Download, Upload, Trash2, Database, Shield, Sparkles, Loader2, Check, Globe, Bell, FileText, Sun, Moon, Languages, AlertCircle,
 } from 'lucide-react'
 import { useTranslation } from '@/hooks/use-translation'
 import { useTheme } from 'next-themes'
@@ -71,13 +73,46 @@ function SettingsBody({ data }: { data: { user: { id: string; name: string | nul
   }
 
   const handleExportJson = () => {
-    window.location.href = '/api/export?format=json'
+    window.location.href = '/api/data-export'
     toast.success(isAr ? 'تم بدء التصدير' : 'JSON export started')
   }
 
   const handleExportCsv = () => {
     window.location.href = '/api/export?format=csv'
     toast.success(isAr ? 'تم بدء التصدير' : 'CSV export started')
+  }
+
+  const handleImportJson = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.json,application/json'
+    input.onchange = async () => {
+      const file = input.files?.[0]
+      if (!file) return
+      try {
+        const raw = await file.text()
+        const parsed = JSON.parse(raw)
+        const res = await apiFetch('/api/data-export', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: raw,
+        })
+        const result = await res.json()
+        if (!res.ok) {
+          toast.error(result.error || (isAr ? 'فشل الاستيراد' : 'Import failed'))
+          return
+        }
+        const c = result.counts
+        toast.success(
+          isAr
+            ? `تم الاستيراد: ${c.events} حدث، ${c.categories} فئة، ${c.conversations} محادثة، ${c.templates} قالب، ${c.goals} هدف، ${c.notifications} إشعار`
+            : `Imported: ${c.events} events, ${c.categories} categories, ${c.conversations} conversations`,
+        )
+      } catch {
+        toast.error(isAr ? 'ملف غير صالح — يجب أن يكون JSON من تصدير التطبيق' : 'Invalid file — must be a JSON export from this app')
+      }
+    }
+    input.click()
   }
 
   const handleDelete = () => {
@@ -183,7 +218,9 @@ function SettingsBody({ data }: { data: { user: { id: string; name: string | nul
       </SectionCard>
 
       {/* Privacy */}
-      <SectionCard icon={Shield} title={tr('Privacy & data control', 'الخصوصية والتحكم في البيانات')} description={tr('Export or delete your data', 'صدّر أو احذف بياناتك')}>
+      <SectionCard icon={Shield} title={tr('Privacy & data control', 'الخصوصية والتحكم في البيانات')} description={tr('Accounts, export or delete your data', 'الحسابات، التصدير أو حذف البيانات')}>
+        <AccountSwitcher />
+        <Separator className="my-2" />
         <div className="space-y-3">
           <div className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
@@ -192,7 +229,7 @@ function SettingsBody({ data }: { data: { user: { id: string; name: string | nul
               </div>
               <div>
                 <div className="text-sm font-medium">{tr('Export all data', 'تصدير كل البيانات')}</div>
-                <p className="text-xs text-muted-foreground">{tr('Download as JSON or CSV', 'حمّل بصيغة JSON أو CSV')}</p>
+                <p className="text-xs text-muted-foreground">{tr('Full backup: events, categories, gaps, conversations, habits, templates, goals, notifications.', 'نسخة احتياطية كاملة: الأحداث، الفئات، الفجوات، المحادثات، العادات، القوالب، الأهداف، الإشعارات. ملف JSON ده تقدر ترجّع منه بياناتك على أي جهاز.')}</p>
               </div>
             </div>
             <div className="flex shrink-0 gap-1.5">
@@ -201,6 +238,9 @@ function SettingsBody({ data }: { data: { user: { id: string; name: string | nul
               </Button>
               <Button variant="outline" size="sm" className="h-9 border-teal-500/30 text-teal-700 hover:bg-teal-500/10 dark:text-teal-300" onClick={handleExportCsv}>
                 <FileText className="mr-1 h-3.5 w-3.5" /> CSV
+              </Button>
+              <Button variant="outline" size="sm" className="h-9 border-indigo-500/30 text-indigo-700 hover:bg-indigo-500/10 dark:text-indigo-300" onClick={handleImportJson}>
+                <Upload className="mr-1 h-3.5 w-3.5" /> {tr('Import', 'استيراد')}
               </Button>
             </div>
           </div>
@@ -283,7 +323,7 @@ function AIProviderSection() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const r = await fetch('/api/settings/ai')
+      const r = await apiFetch('/api/settings/ai')
       const j = await r.json()
       setConfig({
         providerType: j.providerType ?? 'openai',
@@ -307,7 +347,7 @@ function AIProviderSection() {
     if (!config) return
     setSaving(true)
     try {
-      const r = await fetch('/api/settings/ai', {
+      const r = await apiFetch('/api/settings/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config),

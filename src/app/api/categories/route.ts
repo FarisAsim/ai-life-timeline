@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDemoUser } from '@/lib/services/demo-user'
+import { resolveUser } from '@/lib/api-account'
 import { listCategories } from '@/lib/services/category-service'
 
-export async function GET() {
-  const user = await getDemoUser()
+export async function GET(req: NextRequest) {
+  const user = await resolveUser(req)
   const categories = await listCategories(user.id)
   return NextResponse.json({ categories })
 }
 
 export async function POST(req: NextRequest) {
-  const user = await getDemoUser()
+  const user = await resolveUser(req)
   const body = await req.json()
   const { name, color, icon } = body
   if (!name || !color) return NextResponse.json({ error: 'name and color required' }, { status: 400 })

@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { Providers } from "@/components/providers";
+import { ServiceWorkerRegistrar } from "@/components/service-worker-registrar";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -69,6 +70,7 @@ export default function RootLayout({
           {children}
           <Toaster />
           <SonnerToaster position="top-right" richColors />
+          <ServiceWorkerRegistrar />
         </Providers>
       </body>
     </html>

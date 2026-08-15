@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDemoUser } from '@/lib/services/demo-user'
+import { resolveUser } from '@/lib/api-account'
 import { chat, listConversations, getConversation } from '@/lib/services/companion-service'
 
 export async function GET(req: NextRequest) {
-  const user = await getDemoUser()
+  const user = await resolveUser(req)
   const convId = req.nextUrl.searchParams.get('conversationId')
   if (convId) {
     const conv = await getConversation(user.id, convId)
@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const user = await getDemoUser()
+  const user = await resolveUser(req)
   const body = await req.json()
   const { message, conversationId } = body
   if (!message) return NextResponse.json({ error: 'message required' }, { status: 400 })

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDemoUser } from '@/lib/services/demo-user'
+import { resolveUser } from '@/lib/api-account'
 import { listEventsForDay, createEvent } from '@/lib/services/timeline-service'
 import { OverlapError } from '@/lib/services/overlap-service'
 
 export async function GET(req: NextRequest) {
-  const user = await getDemoUser()
+  const user = await resolveUser(req)
   const date = req.nextUrl.searchParams.get('date')
   if (!date) return NextResponse.json({ error: 'date query param required' }, { status: 400 })
   const events = await listEventsForDay(user.id, date)
@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const user = await getDemoUser()
+  const user = await resolveUser(req)
   const body = await req.json()
   if (!body.title || !body.startTime || !body.endTime) {
     return NextResponse.json({ error: 'title, startTime, endTime required' }, { status: 400 })

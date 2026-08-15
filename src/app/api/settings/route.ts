@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDemoUser } from '@/lib/services/demo-user'
+import { resolveUser } from '@/lib/api-account'
 import { db } from '@/lib/db'
 
-export async function GET() {
-  const user = await getDemoUser()
+export async function GET(req: NextRequest) {
+  const user = await resolveUser(req)
   const stats = {
     eventCount: await db.timelineEvent.count({ where: { userId: user.id } }),
     unknownBlockCount: await db.unknownBlock.count({ where: { userId: user.id } }),
@@ -26,7 +26,7 @@ export async function GET() {
 }
 
 export async function PATCH(req: NextRequest) {
-  const user = await getDemoUser()
+  const user = await resolveUser(req)
   const body = await req.json()
   const { name, timezone, quietHoursStart, quietHoursEnd } = body
   const updated = await db.user.update({

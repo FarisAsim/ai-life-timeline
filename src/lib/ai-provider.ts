@@ -36,6 +36,7 @@ function getConfig() {
     sttModel: cfg.sttModel,
     geminiApiKey: cfg.geminiApiKey,
     geminiModel: cfg.geminiModel,
+    geminiFallbackModels: cfg.geminiFallbackModels,
   }
 }
 
@@ -56,6 +57,61 @@ const TRANSCRIBE_PROMPT =
   'Write down exactly what is said in this audio, word for word, in the language used (it may be Arabic, Egyptian dialect, or any other language). Do not translate, do not summarize, do not add commentary — output only the raw transcript.'
 
 const FFMPEG_PATH = process.env.FFMPEG_PATH ?? 'ffmpeg'
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/**
+ * Wrap an async API call with automatic retries for rate-limit (429) errors.
+ * Google free tier allows 15 requests/min and 1500/day per key. When that
+ * window is hit we wait briefly and retry up to `maxAttempts` times.
+ * All other errors are thrown immediately with a friendly Arabic message so
+ * the user never sees raw English JSON.
+ *
+ * This is intentionally NOT a response cache — every retry asks Gemini
+ * again, so answers stay fresh and time-dependent (no cached replies).
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  ctx: { label: string },
+  maxAttempts = 3,
+): Promise<T> {
+  let lastError: Error | null = null
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err))
+      const msg = lastError.message
+      const statusMatch = msg.match(/\((\d{3})\)/)
+      const status = statusMatch ? Number(statusMatch[1]) : 0
+
+      // Rate limit → wait (5s / 15s / 30s backoff) and retry
+      if (status === 429 || /rate|quota|RESOURCE_EXHAUSTED/i.test(msg)) {
+        if (attempt < maxAttempts) {
+          await sleep(5000 * Math.pow(3, attempt - 1))
+          continue
+        }
+        throw new Error(
+          `RATE_LIMIT:${ctx.label}:وصلنا لحد السماح المؤقت من Google (الطبقة المجانية). الخدمة هترجع تشتغل تلقائيًا خلال ساعة تقريبًا. جرّب تاني بعد شوية.`,
+        )
+      }
+
+      // Invalid/revoked key
+      if (status === 401 || status === 403) {
+        throw new Error(
+          `AUTH_ERROR:${ctx.label}:مفتاح Google Gemini مش شغال أو منتهي. افتح الإعدادات ← الذكاء الاصطناعي وتحقّق من المفتاح.`,
+        )
+      }
+
+      // Any other error → immediate friendly Arabic message
+      throw new Error(
+        `AI_ERROR:${ctx.label}:حصل خطأ في الاتصال بخدمة الذكاء الاصطناعي (${status || 'خطأ غير معروف'}). جرّب تاني بعد شوية.`,
+      )
+    }
+  }
+  // All retries exhausted on rate limit
+  throw lastError ?? new Error(`AI_ERROR:${ctx.label}:حدث خطأ غير معروف في خدمة الذكاء الاصطناعي.`)
+}
 
 /** Convert any supported audio (base64) to audio/opus via ffmpeg. */
 async function convertToOpus(base64Audio: string): Promise<string> {
@@ -93,9 +149,17 @@ export async function transcribeAudio(base64Audio: string): Promise<{ text: stri
 
   const cfg = getConfig()
   if (cfg.providerType === 'gemini') {
-    return transcribeWithGemini(base64Audio, cfg.geminiApiKey, cfg.geminiModel)
+    return withFallbackModels(
+      cfg.geminiModel,
+      cfg.geminiFallbackModels,
+      (model) => transcribeWithGemini(base64Audio, cfg.geminiApiKey, model),
+      { label: 'تحويل الصوت لنص' },
+    )
   }
-  return transcribeWithOpenAI(base64Audio, cfg.apiKey, cfg.baseUrl, cfg.sttModel)
+  return withRetry(
+    () => transcribeWithOpenAI(base64Audio, cfg.apiKey, cfg.baseUrl, cfg.sttModel),
+    { label: 'تحويل الصوت لنص' },
+  )
 }
 
 async function transcribeWithOpenAI(
@@ -192,6 +256,40 @@ export interface ChatMessage {
 }
 
 /**
+ * When the primary Gemini model hits a persistent quota (429), automatically
+ * try each fallback model in order. Every Gemini model has its own free-tier
+ * quota counter, so rotating effectively multiplies the free quota. After a
+ * successful fallback we still retry the primary later — the caller uses
+ * withRetry per model too.
+ */
+async function withFallbackModels<T>(
+  primaryModel: string,
+  fallbacks: string[],
+  fn: (model: string) => Promise<T>,
+  ctx: { label: string },
+): Promise<T> {
+  try {
+    return await withRetry(() => fn(primaryModel), ctx)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    const isQuota = /429|Quota exceeded|quota/.test(msg)
+    if (!isQuota || fallbacks.length === 0) throw err
+    let lastErr: Error = err instanceof Error ? err : new Error(String(err))
+    for (const model of fallbacks) {
+      try {
+        return await withRetry(() => fn(model), { ...ctx, label: ctx.label + ` (${model})` })
+      } catch (e) {
+        lastErr = e instanceof Error ? e : new Error(String(e))
+        const m = lastErr.message
+        // If this fallback also failed with quota, try the next one; otherwise bail out
+        if (!/429|Quota exceeded|quota/.test(m)) throw lastErr
+      }
+    }
+    throw lastErr
+  }
+}
+
+/**
  * Chat completion using the active remote provider (non-streaming).
  * - 'openai': POST /v1/chat/completions (OpenAI chat format)
  * - 'gemini': Gemini interactions API (text + optional audio input)
@@ -203,9 +301,17 @@ export async function chatCompletion(messages: ChatMessage[], temperature = 0.7)
 
   const cfg = getConfig()
   if (cfg.providerType === 'gemini') {
-    return chatWithGemini(messages, temperature, cfg.geminiApiKey, cfg.geminiModel)
+    return withFallbackModels(
+      cfg.geminiModel,
+      cfg.geminiFallbackModels,
+      (model) => chatWithGemini(messages, temperature, cfg.geminiApiKey, model),
+      { label: 'رد المساعد الذكي' },
+    )
   }
-  return chatWithOpenAI(messages, temperature, cfg.apiKey, cfg.baseUrl, cfg.model)
+  return withRetry(
+    () => chatWithOpenAI(messages, temperature, cfg.apiKey, cfg.baseUrl, cfg.model),
+    { label: 'رد المساعد الذكي' },
+  )
 }
 
 async function chatWithOpenAI(

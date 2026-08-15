@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDemoUser } from '@/lib/services/demo-user'
+import { resolveUser } from '@/lib/api-account'
 import { db } from '@/lib/db'
 import { createEvent } from '@/lib/services/timeline-service'
 import { OverlapError } from '@/lib/services/overlap-service'
 import { transcribeAudio, chatCompletion, isRemoteAIConfigured } from '@/lib/ai-provider'
 
 export async function POST(req: NextRequest) {
-  const user = await getDemoUser()
+  const user = await resolveUser(req)
   const body = await req.json()
   const { audio, create: shouldCreate, text } = body as { audio?: string; create?: boolean; text?: string }
 
   // If text is provided directly (fallback), skip ASR
   if (text) {
-    return parseTextToEvent(user.id, text, shouldCreate)
+    return parseTextToEvent(user.id, text, req, shouldCreate)
   }
 
   if (!audio) return NextResponse.json({ error: 'audio or text required' }, { status: 400 })
@@ -35,17 +35,18 @@ export async function POST(req: NextRequest) {
 
     if (!transcript) {
       // Remote STT unavailable or empty → keyword-based local fallback
-      return fallbackParse(base64, shouldCreate)
+      return fallbackParse(base64, req, shouldCreate)
     }
 
-    return parseTextToEvent(user.id, transcript, shouldCreate)
+    return parseTextToEvent(user.id, transcript, req, shouldCreate)
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Voice capture failed'
-    return NextResponse.json({ error: msg, fallback: true }, { status: 500 })
+    const friendly = translateAIError(msg)
+    return NextResponse.json({ error: friendly, fallback: true }, { status: 500 })
   }
 }
 
-async function parseTextToEvent(userId: string, transcript: string, shouldCreate?: boolean) {
+async function parseTextToEvent(userId: string, transcript: string, req: NextRequest, shouldCreate?: boolean) {
   // Detect language
   const arabicChars = (transcript.match(/[\u0600-\u06FF]/g) || []).length
   const totalChars = transcript.replace(/\s/g, '').length
@@ -102,7 +103,7 @@ Respond with ONLY valid JSON:
 
   if (!isRemoteAIConfigured()) {
     // No remote AI → use smart local keyword parsing
-    return fallbackParse('', shouldCreate, transcript)
+    return fallbackParse('', req, shouldCreate, transcript)
   }
 
   try {
@@ -114,7 +115,7 @@ Respond with ONLY valid JSON:
     parsed = JSON.parse(cleaned)
   } catch {
     // AI provider failed mid-request — fall back to basic parsing
-    return fallbackParse('', shouldCreate, transcript)
+    return fallbackParse('', req, shouldCreate, transcript)
   }
 
   // Handle missingTime — if user didn't specify time, return a prompt asking for it
@@ -207,14 +208,14 @@ Respond with ONLY valid JSON:
  * Supports an optional transcript override (when ASR worked but LLM is unavailable).
  * Arabic hour mentions: "الساعة ثلاثة"/"الساعة ٣" etc.
  */
-async function fallbackParse(base64: string, shouldCreate?: boolean, transcriptOverride?: string): Promise<NextResponse> {
+async function fallbackParse(base64: string, req: NextRequest, shouldCreate?: boolean, transcriptOverride?: string): Promise<NextResponse> {
   const now = new Date()
   const transcript = transcriptOverride ?? ''
   const detectedLanguage = /[\u0600-\u06FF]/.test(transcript) ? 'ar' : 'en'
 
   if (!transcript) {
     // ASR and AI both unavailable — record a voice note with a generic title
-    const userId = (await getDemoUser()).id
+    const userId = (await resolveUser(req)).id
     const eventData = {
       title: detectedLanguage === 'ar' ? 'ملاحظة صوتية' : 'Voice note',
       startTime: now.toISOString(),
@@ -254,7 +255,7 @@ async function fallbackParse(base64: string, shouldCreate?: boolean, transcriptO
     transcript.match(/الساعة\s+(واحد|اثنين|ثلاث|أربع|خمس|ست|سبع|ثمان|تسع|عشر|١٢|١|٢|٣|٤|٥|٦|٧|٨|٩|١٠|١١)/i) ||
     transcript.match(/\b(?:at\s+)?(1[0-2]|\d)\s*(pm)\b/i) ||
     transcript.match(/\b(?:at\s+)?(\d{1,2})\b/i)
-  const userId = (await getDemoUser()).id
+  const userId = (await resolveUser(req)).id
 
   let startTime: string = now.toISOString()
   if (hourMatch) {
@@ -301,4 +302,22 @@ async function fallbackParse(base64: string, shouldCreate?: boolean, transcriptO
     created: createdEvent ? { id: createdEvent.id, title: createdEvent.title } : null,
     aiUnavailable: true,
   })
+}
+
+/**
+ * Turn raw ai-provider error messages into friendly Arabic messages.
+ * ai-provider prefixes errors with TYPE:label:message (all in Arabic already)
+ * or throws raw English errors; this normalizes both.
+ */
+function translateAIError(msg: string): string {
+  if (msg.startsWith('RATE_LIMIT:')) return msg.split(':').slice(2).join(':')
+  if (msg.startsWith('AUTH_ERROR:')) return msg.split(':').slice(2).join(':')
+  if (msg.startsWith('AI_ERROR:')) return msg.split(':').slice(2).join(':')
+  if (/429|quota|rate|RESOURCE_EXHAUSTED/i.test(msg)) {
+    return 'وصلنا لحد السماح المؤقت من Google (الطبقة المجانية). الخدمة هترجع تشتغل تلقائيًا خلال ساعة تقريبًا. جرّب تاني بعد شوية.'
+  }
+  if (/401|403|API key|Invalid API|invalid key/i.test(msg)) {
+    return 'مفتاح Google Gemini مش شغال أو منتهي. افتح الإعدادات ← الذكاء الاصطناعي وتحقّق من المفتاح.'
+  }
+  return msg || 'حصل خطأ أثناء معالجة التسجيل الصوتي. جرّب تاني بعد شوية.'
 }

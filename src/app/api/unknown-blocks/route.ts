@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDemoUser } from '@/lib/services/demo-user'
+import { resolveUser } from '@/lib/api-account'
 import { listOpenBlocks, listAllBlocks } from '@/lib/services/gap-detection-service'
 import { generateAiGuess } from '@/lib/services/companion-service'
 import { resolveBlockWithText, resolveBlockAsUnknown, deleteBlock } from '@/lib/services/gap-detection-service'
 
 export async function GET(req: NextRequest) {
-  const user = await getDemoUser()
+  const user = await resolveUser(req)
   const all = req.nextUrl.searchParams.get('all') === 'true'
   const blocks = all ? await listAllBlocks(user.id) : await listOpenBlocks(user.id)
   return NextResponse.json({ blocks })
@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
 // Resolve a block with text, or generate an AI guess
 export async function POST(req: NextRequest) {
-  const user = await getDemoUser()
+  const user = await resolveUser(req)
   const body = await req.json()
   const { action, blockId } = body
   if (!blockId) return NextResponse.json({ error: 'blockId required' }, { status: 400 })
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const user = await getDemoUser()
+  const user = await resolveUser(req)
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })

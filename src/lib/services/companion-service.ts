@@ -142,8 +142,16 @@ export async function chat(userId: string, conversationId: string | null, userMe
     try {
       raw = await chatCompletion(messages)
     } catch (err) {
-
-      raw = noAIReply(userMessage)
+      const msg = err instanceof Error ? err.message : ''
+      if (/RATE_LIMIT|429|quota|rate|RESOURCE_EXHAUSTED/i.test(msg)) {
+        // Transient Google rate limit — tell the user in Arabic instead of
+        // claiming the AI key is missing (it isn't).
+        raw = 'وصلنا لحد السماح المؤقت من Google (الطبقة المجانية) وحاليًا مش قادرين نوصل للمساعد. الخدمة هترجع تشتغل تلقائيًا خلال ساعة تقريبًا — جرّب تاني بعد شوية.\n\nوفي الوقت ده باقي مميزات التطبيق شغالة عادي: التسجيل اليدوي، الإضافة السريعة، والفجوات.'
+      } else if (/AUTH_ERROR|401|403|API key|Invalid API/i.test(msg)) {
+        raw = 'مفتاح Google Gemini مش شغال أو منتهي. افتح الإعدادات ← الذكاء الاصطناعي وتحقّق من المفتاح.\n\nوفي الوقت ده باقي مميزات التطبيق شغالة عادي.'
+      } else {
+        raw = noAIReply(userMessage)
+      }
     }
   }
 

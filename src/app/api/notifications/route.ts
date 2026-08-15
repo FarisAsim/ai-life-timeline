@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDemoUser } from '@/lib/services/demo-user'
+import { resolveUser } from '@/lib/api-account'
 import { listNotifications, markRead, markAllRead, countUnread, runNotificationEngine } from '@/lib/services/notification-service'
 
 export async function GET(req: NextRequest) {
-  const user = await getDemoUser()
+  const user = await resolveUser(req)
   const onlyUnread = req.nextUrl.searchParams.get('unread') === 'true'
   const [notifications, unreadCount] = await Promise.all([
     listNotifications(user.id, onlyUnread),
@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const user = await getDemoUser()
+  const user = await resolveUser(req)
   const body = await req.json()
   if (body.action === 'run_engine') {
     const created = await runNotificationEngine(user.id)

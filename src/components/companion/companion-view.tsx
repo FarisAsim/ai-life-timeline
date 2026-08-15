@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { apiFetch } from '@/hooks/use-data'
 import { useCompanionChat, useConversations } from '@/hooks/use-data'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -66,7 +67,7 @@ export function CompanionView() {
   const loadConversation = async (id: string) => {
     setLoadingConv(true)
     try {
-      const r = await fetch(`/api/companion?conversationId=${id}`)
+      const r = await apiFetch(`/api/companion?conversationId=${id}`)
       const j = await r.json()
       const conv = j.conversation
       if (conv) {
@@ -115,7 +116,7 @@ export function CompanionView() {
               action: {
                 label: 'Undo',
                 onClick: () => {
-                  fetch(`/api/timeline/${result.actionResult!.eventId}`, { method: 'DELETE' })
+                  apiFetch(`/api/timeline/${result.actionResult!.eventId}`, { method: 'DELETE' })
                     .then(() => toast.success(t('companion.eventRemoved')))
                     .catch(() => toast.error(t('companion.undoFailed')))
                 },
@@ -171,7 +172,7 @@ export function CompanionView() {
       const reader = new FileReader()
       reader.onloadend = async () => {
         const base64 = reader.result as string
-        const r = await fetch('/api/voice', {
+        const r = await apiFetch('/api/voice', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ audio: base64 }),

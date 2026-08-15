@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDemoUser } from '@/lib/services/demo-user'
+import { resolveUser } from '@/lib/api-account'
 import { getMonthCompletion } from '@/lib/services/calendar-service'
 
 export async function GET(req: NextRequest) {
-  const user = await getDemoUser()
+  const user = await resolveUser(req)
   const yearParam = req.nextUrl.searchParams.get('year')
   const monthParam = req.nextUrl.searchParams.get('month')
   const now = new Date()

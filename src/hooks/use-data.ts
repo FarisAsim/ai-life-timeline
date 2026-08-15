@@ -3,12 +3,25 @@ import { useAppStore } from '@/stores/app-store'
 import type { Category, TimelineEvent, Attachment } from '@/lib/types'
 import type { CreateEventInput } from '@/lib/services/timeline-service'
 
+/**
+ * Central API fetch that attaches the active local-account id so the server
+ * scopes every query to the right user (device-level multi-account auth).
+ */
+export function apiFetch(url: string, init?: RequestInit): Promise<Response> {
+  const accountId = typeof window !== 'undefined' ? localStorage.getItem('lt-active-account') : null
+  const headers = new Headers(init?.headers ?? {})
+  if (accountId && accountId.length > 10) {
+    headers.set('X-Account-Id', accountId)
+  }
+  return fetch(url, { ...init, headers })
+}
+
 // ---------- Categories ----------
 export function useCategories() {
   return useQuery<Category[]>({
     queryKey: ['categories'],
     queryFn: async () => {
-      const r = await fetch('/api/categories')
+      const r = await apiFetch('/api/categories')
       const j = await r.json()
       return j.categories
     },
@@ -20,7 +33,7 @@ export function useCreateCategory() {
   const triggerRefresh = useAppStore((s) => s.triggerRefresh)
   return useMutation({
     mutationFn: async (vars: { name: string; color: string; icon?: string }) => {
-      const r = await fetch('/api/categories', {
+      const r = await apiFetch('/api/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(vars),
@@ -40,7 +53,7 @@ export function useDeleteCategory() {
   const triggerRefresh = useAppStore((s) => s.triggerRefresh)
   return useMutation({
     mutationFn: async (id: string) => {
-      const r = await fetch(`/api/categories/${id}`, { method: 'DELETE' })
+      const r = await apiFetch(`/api/categories/${id}`, { method: 'DELETE' })
       if (!r.ok) {
         const err = await r.json().catch(() => ({ error: 'Delete failed' }))
         throw new Error(err.error || 'Delete failed')
@@ -62,7 +75,7 @@ export function useTimelineDay() {
   return useQuery<TimelineEvent[]>({
     queryKey: ['timeline', date, refreshTick],
     queryFn: async () => {
-      const r = await fetch(`/api/timeline?date=${date}`)
+      const r = await apiFetch(`/api/timeline?date=${date}`)
       const j = await r.json()
       return j.events
     },
@@ -74,7 +87,7 @@ export function useCreateEvent() {
   const triggerRefresh = useAppStore((s) => s.triggerRefresh)
   return useMutation({
     mutationFn: async (input: CreateEventInput) => {
-      const r = await fetch('/api/timeline', {
+      const r = await apiFetch('/api/timeline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
@@ -97,7 +110,7 @@ export function useUpdateEvent() {
   const triggerRefresh = useAppStore((s) => s.triggerRefresh)
   return useMutation({
     mutationFn: async ({ id, ...input }: Partial<CreateEventInput> & { id: string }) => {
-      const r = await fetch(`/api/timeline/${id}`, {
+      const r = await apiFetch(`/api/timeline/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
@@ -119,7 +132,7 @@ export function useDeleteEvent() {
   const triggerRefresh = useAppStore((s) => s.triggerRefresh)
   return useMutation({
     mutationFn: async (id: string) => {
-      const r = await fetch(`/api/timeline/${id}`, { method: 'DELETE' })
+      const r = await apiFetch(`/api/timeline/${id}`, { method: 'DELETE' })
       if (!r.ok) throw new Error('Failed to delete event')
       return r.json()
     },
@@ -139,7 +152,7 @@ export function useUnknownBlocks(all = false) {
   return useQuery({
     queryKey: ['unknown-blocks', all, refreshTick],
     queryFn: async () => {
-      const r = await fetch(`/api/unknown-blocks${all ? '?all=true' : ''}`)
+      const r = await apiFetch(`/api/unknown-blocks${all ? '?all=true' : ''}`)
       const j = await r.json()
       return j.blocks
     },
@@ -151,7 +164,7 @@ export function useAiGuess() {
   const triggerRefresh = useAppStore((s) => s.triggerRefresh)
   return useMutation({
     mutationFn: async (blockId: string) => {
-      const r = await fetch('/api/unknown-blocks', {
+      const r = await apiFetch('/api/unknown-blocks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'ai_guess', blockId }),
@@ -171,7 +184,7 @@ export function useResolveBlock() {
   const triggerRefresh = useAppStore((s) => s.triggerRefresh)
   return useMutation({
     mutationFn: async (vars: { blockId: string; title: string; categoryId: string | null; description?: string }) => {
-      const r = await fetch('/api/unknown-blocks', {
+      const r = await apiFetch('/api/unknown-blocks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'resolve_text', ...vars }),
@@ -194,7 +207,7 @@ export function useConfirmUnknown() {
   const triggerRefresh = useAppStore((s) => s.triggerRefresh)
   return useMutation({
     mutationFn: async (blockId: string) => {
-      const r = await fetch('/api/unknown-blocks', {
+      const r = await apiFetch('/api/unknown-blocks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'confirm_unknown', blockId }),
@@ -216,7 +229,7 @@ export function useMonthCompletion(year: number, month: number) {
   return useQuery({
     queryKey: ['calendar', year, month, refreshTick],
     queryFn: async () => {
-      const r = await fetch(`/api/calendar?year=${year}&month=${month}`)
+      const r = await apiFetch(`/api/calendar?year=${year}&month=${month}`)
       return r.json()
     },
   })
@@ -227,7 +240,7 @@ export function useConversations() {
   return useQuery({
     queryKey: ['conversations'],
     queryFn: async () => {
-      const r = await fetch('/api/companion')
+      const r = await apiFetch('/api/companion')
       const j = await r.json()
       return j.conversations
     },
@@ -238,7 +251,7 @@ export function useCompanionChat() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (vars: { message: string; conversationId?: string | null }) => {
-      const r = await fetch('/api/companion', {
+      const r = await apiFetch('/api/companion', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(vars),
@@ -260,7 +273,7 @@ export function useInsights(days = 30) {
   return useQuery({
     queryKey: ['insights', days, refreshTick],
     queryFn: async () => {
-      const r = await fetch(`/api/insights?days=${days}&lang=${encodeURIComponent(navigator.language)}`)
+      const r = await apiFetch(`/api/insights?days=${days}&lang=${encodeURIComponent(navigator.language)}`)
       return r.json()
     },
   })
@@ -272,7 +285,7 @@ export function useSearch(query: string) {
     queryKey: ['search', query],
     queryFn: async () => {
       if (!query.trim()) return []
-      const r = await fetch(`/api/search?q=${encodeURIComponent(query)}`)
+      const r = await apiFetch(`/api/search?q=${encodeURIComponent(query)}`)
       const j = await r.json()
       return j.results
     },
@@ -286,7 +299,7 @@ export function useNotifications() {
   return useQuery({
     queryKey: ['notifications', refreshTick],
     queryFn: async () => {
-      const r = await fetch('/api/notifications')
+      const r = await apiFetch('/api/notifications')
       const j = await r.json()
       return j
     },
@@ -298,7 +311,7 @@ export function useRunNotificationEngine() {
   const triggerRefresh = useAppStore((s) => s.triggerRefresh)
   return useMutation({
     mutationFn: async () => {
-      const r = await fetch('/api/notifications', {
+      const r = await apiFetch('/api/notifications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'run_engine' }),
@@ -317,7 +330,7 @@ export function useMarkAllRead() {
   const triggerRefresh = useAppStore((s) => s.triggerRefresh)
   return useMutation({
     mutationFn: async () => {
-      const r = await fetch('/api/notifications', {
+      const r = await apiFetch('/api/notifications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'mark_all_read' }),
@@ -337,7 +350,7 @@ export function useDetectGaps() {
   const triggerRefresh = useAppStore((s) => s.triggerRefresh)
   return useMutation({
     mutationFn: async (date: string) => {
-      const r = await fetch('/api/gap-detection', {
+      const r = await apiFetch('/api/gap-detection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date }),
@@ -358,7 +371,7 @@ export function useSeed() {
   const triggerRefresh = useAppStore((s) => s.triggerRefresh)
   return useMutation({
     mutationFn: async () => {
-      const r = await fetch('/api/seed', { method: 'POST' })
+      const r = await apiFetch('/api/seed', { method: 'POST' })
       return r.json()
     },
     onSuccess: () => {
@@ -374,7 +387,7 @@ export function useSettings() {
   return useQuery({
     queryKey: ['settings', refreshTick],
     queryFn: async () => {
-      const r = await fetch('/api/settings')
+      const r = await apiFetch('/api/settings')
       return r.json()
     },
   })
@@ -385,7 +398,7 @@ export function useUpdateSettings() {
   const triggerRefresh = useAppStore((s) => s.triggerRefresh)
   return useMutation({
     mutationFn: async (vars: { name?: string; timezone?: string; quietHoursStart?: string; quietHoursEnd?: string }) => {
-      const r = await fetch('/api/settings', {
+      const r = await apiFetch('/api/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(vars),
@@ -405,7 +418,7 @@ export function useDeleteAccount() {
   const triggerRefresh = useAppStore((s) => s.triggerRefresh)
   return useMutation({
     mutationFn: async () => {
-      const r = await fetch('/api/account', { method: 'DELETE' })
+      const r = await apiFetch('/api/account', { method: 'DELETE' })
       if (!r.ok) throw new Error('Failed to delete account')
       return r.json()
     },
@@ -428,7 +441,7 @@ export function useUploadAttachment() {
         reader.onerror = reject
         reader.readAsDataURL(vars.file)
       })
-      const r = await fetch('/api/attachments', {
+      const r = await apiFetch('/api/attachments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -456,7 +469,7 @@ export function useDeleteAttachment() {
   const triggerRefresh = useAppStore((s) => s.triggerRefresh)
   return useMutation({
     mutationFn: async (id: string) => {
-      const r = await fetch(`/api/attachments/${id}`, { method: 'DELETE' })
+      const r = await apiFetch(`/api/attachments/${id}`, { method: 'DELETE' })
       if (!r.ok) throw new Error('Delete failed')
       return r.json()
     },
@@ -477,7 +490,7 @@ export function useTemplates() {
   return useQuery({
     queryKey: ['templates', refreshTick],
     queryFn: async () => {
-      const r = await fetch('/api/templates')
+      const r = await apiFetch('/api/templates')
       const j = await r.json()
       return j.templates
     },
@@ -489,7 +502,7 @@ export function useCreateTemplate() {
   const triggerRefresh = useAppStore((s) => s.triggerRefresh)
   return useMutation({
     mutationFn: async (vars: { title: string; categoryId?: string | null; durationMin?: number; description?: string }) => {
-      const r = await fetch('/api/templates', {
+      const r = await apiFetch('/api/templates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(vars),
@@ -509,7 +522,7 @@ export function useDeleteTemplate() {
   const triggerRefresh = useAppStore((s) => s.triggerRefresh)
   return useMutation({
     mutationFn: async (id: string) => {
-      const r = await fetch(`/api/templates/${id}`, { method: 'DELETE' })
+      const r = await apiFetch(`/api/templates/${id}`, { method: 'DELETE' })
       if (!r.ok) throw new Error('Failed to delete template')
       return r.json()
     },
@@ -526,7 +539,7 @@ export function useGoals() {
   return useQuery({
     queryKey: ['goals', refreshTick],
     queryFn: async () => {
-      const r = await fetch('/api/goals')
+      const r = await apiFetch('/api/goals')
       const j = await r.json()
       return j.goals
     },
@@ -538,7 +551,7 @@ export function useCreateGoal() {
   const triggerRefresh = useAppStore((s) => s.triggerRefresh)
   return useMutation({
     mutationFn: async (vars: { title: string; type: string; categoryId?: string | null; tag?: string | null; targetValue: number; period: string }) => {
-      const r = await fetch('/api/goals', {
+      const r = await apiFetch('/api/goals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(vars),
@@ -558,7 +571,7 @@ export function useDeleteGoal() {
   const triggerRefresh = useAppStore((s) => s.triggerRefresh)
   return useMutation({
     mutationFn: async (id: string) => {
-      const r = await fetch(`/api/goals/${id}`, { method: 'DELETE' })
+      const r = await apiFetch(`/api/goals/${id}`, { method: 'DELETE' })
       if (!r.ok) throw new Error('Failed to delete goal')
       return r.json()
     },

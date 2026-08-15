@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
+import { apiFetch } from '@/hooks/use-data'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -59,7 +60,7 @@ export function VoiceCaptureDialog({ open, onOpenChange }: VoiceCaptureDialogPro
         reader.onloadend = async () => {
           const dataUrl = reader.result as string
           try {
-            const r = await fetch('/api/voice-capture', {
+            const r = await apiFetch('/api/voice-capture', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ audio: dataUrl, create: false }),
@@ -116,7 +117,7 @@ export function VoiceCaptureDialog({ open, onOpenChange }: VoiceCaptureDialogPro
     setTranscribing(true)
     setError(null)
     try {
-      const r = await fetch('/api/voice-capture', {
+      const r = await apiFetch('/api/voice-capture', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, create: false }),

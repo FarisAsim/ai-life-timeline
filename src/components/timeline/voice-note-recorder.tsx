@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
+import { apiFetch } from '@/hooks/use-data'
 import { Button } from '@/components/ui/button'
 import { useUploadAttachment } from '@/hooks/use-data'
 import { Mic, Square, Loader2, Play, Pause, X, Sparkles } from 'lucide-react'
@@ -147,14 +148,21 @@ export function VoiceNotePlayer({ attachmentId, filename, transcript: initialTra
   const transcribe = async () => {
     setTranscribing(true)
     try {
-      const r = await fetch(`/api/attachments/${attachmentId}/transcribe`, { method: 'POST' })
+      const r = await apiFetch(`/api/attachments/${attachmentId}/transcribe`, { method: 'POST' })
       const j = await r.json()
       if (j.transcript) {
         setTranscript(j.transcript)
         setShowTranscript(true)
         toast.success(t('voice.transcriptReady'))
       } else {
-        toast.error(j.error || t('voice.transcribeFailed'))
+        // Show the API's error as-is when it is a friendly Arabic message,
+        // otherwise fall back to the translated generic label.
+        const friendly =
+          j.error &&
+          /حد السماح|مفتاح|الطبقة المجانية|جرّب تاني|تحقّق من المفتاح|خطأ/i.test(j.error)
+            ? j.error
+            : t('voice.transcribeFailed')
+        toast.error(friendly)
       }
     } catch {
       toast.error(t('voice.transcribeFailed'))
