@@ -71,13 +71,13 @@ export function CalendarView() {
               </TabsList>
             </Tabs>
             <div className="flex items-center gap-1">
-              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCursor(viewMode === 'month' ? subMonths(cursor, 1) : subWeeks(cursor, 1))}>
+              <Button variant="outline" size="icon" className="h-8 w-8 transition-transform hover:scale-105" onClick={() => setCursor(viewMode === 'month' ? subMonths(cursor, 1) : subWeeks(cursor, 1))} aria-label="Previous" title="Previous">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <Button variant="outline" size="sm" className="h-8" onClick={() => setCursor(new Date())}>
                 Today
               </Button>
-              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCursor(viewMode === 'month' ? addMonths(cursor, 1) : addWeeks(cursor, 1))}>
+              <Button variant="outline" size="icon" className="h-8 w-8 transition-transform hover:scale-105" onClick={() => setCursor(viewMode === 'month' ? addMonths(cursor, 1) : addWeeks(cursor, 1))} aria-label="Next" title="Next">
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>

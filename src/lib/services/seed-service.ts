@@ -1,8 +1,9 @@
 import { db } from '@/lib/db'
 import { addMinutes, subDays, startOfDay } from 'date-fns'
 import { getDemoUser } from './demo-user'
-import { detectGapsForDay } from './gap-detection-service'
+import { detectGapsForDay, listOpenBlocks } from './gap-detection-service'
 import { findOverlappingEvent } from './overlap-service'
+import { createNotification } from './notification-service'
 
 // Generates a realistic week of timeline events so the app has rich data on first load.
 export async function seedDemoData() {
@@ -111,6 +112,37 @@ export async function seedDemoData() {
         actionType: 'view_insight',
       },
     })
+  }
+
+  // Run the full notification engine: generates gap prompts, upcoming nudges,
+  // goal achievements, and the weekly summary digest so the Notifications
+  // panel has rich, realistic content on first load.
+  try {
+    const { runNotificationEngine } = await import('./notification-service')
+    await runNotificationEngine(user.id)
+  } catch {
+    // Non-critical — the panel will stay usable with the welcome notification
+  }
+
+  // Add a sample AI guess so the user sees how AI Guesses work.
+  // Pick the most recent open block and attach a plausible guess.
+  const recentBlocks = await listOpenBlocks(user.id)
+  const freshBlocks = recentBlocks.filter((b) => (now.getTime() - new Date(b.startTime).getTime()) < 3 * 24 * 3600 * 1000)
+  const sampleBlock = freshBlocks[0]
+  if (sampleBlock) {
+    const hasAiGuess = await db.notification.findFirst({
+      where: { userId: user.id, type: 'ai_guess', actionPayload: { contains: sampleBlock.id } },
+    })
+    if (!hasAiGuess) {
+      await createNotification({
+        userId: user.id,
+        type: 'ai_guess',
+        title: 'AI guess for your gap',
+        body: `Based on your pattern (gym + deep work on weekdays), I'd guess this block was a “Commute” or “Walk” segment. Tap it in Unknown Blocks to confirm or correct me — every answer makes me smarter.`,
+        actionType: 'resolve_gap',
+        actionPayload: { blockId: sampleBlock.id },
+      })
+    }
   }
 
   return { seeded: true, dayCount: 8 }
