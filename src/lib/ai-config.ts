@@ -31,13 +31,15 @@ export interface AIConfig {
 }
 
 const DEFAULTS: AIConfig = {
-  providerType: (process.env.AI_PROVIDER_TYPE as AIProviderType) ?? 'openai',
-  apiKey: process.env.AI_API_KEY ?? '',
+  providerType:
+    (process.env.AI_PROVIDER_TYPE as AIProviderType) ??
+    (process.env.GEMINI_API_KEY ? 'gemini' : 'openai'),
+  apiKey: process.env.AI_API_KEY ?? process.env.GEMINI_API_KEY ?? '',
   baseUrl: process.env.AI_BASE_URL ?? 'https://api.openai.com/v1',
   model: process.env.AI_MODEL ?? 'gpt-4o-mini',
   sttModel: process.env.AI_STT_MODEL ?? 'gpt-4o-transcribe',
-  geminiApiKey: process.env.GEMINI_API_KEY ?? '',
-  geminiModel: process.env.GEMINI_MODEL ?? 'gemini-3.6-flash',
+  geminiApiKey: process.env.GEMINI_API_KEY ?? process.env.AI_API_KEY ?? '',
+  geminiModel: process.env.GEMINI_MODEL ?? process.env.AI_MODEL ?? 'gemini-3.6-flash',
   geminiFallbackModels: process.env.GEMINI_FALLBACK_MODELS
     ? process.env.GEMINI_FALLBACK_MODELS.split(',')
     : ['gemini-3.5-flash', 'gemini-3.7-flash'],
@@ -73,7 +75,14 @@ function loadFileConfig(): AIConfig {
 
 export function getAIConfig(): AIConfig & { configured: boolean } {
   const cfg = loadFileConfig()
-  // Merge: file values override env defaults when explicitly set in the file
+  // Merge: file values override env defaults when explicitly set in the file.
+  // Cross-fill: when the provider is gemini but only AI_API_KEY was set
+  // (e.g. via Vercel env vars), use it as the Gemini key as well.
+  if (cfg.providerType === 'gemini' && !cfg.geminiApiKey && cfg.apiKey) {
+    cfg.geminiApiKey = cfg.apiKey
+  } else if (cfg.providerType === 'openai' && !cfg.apiKey && cfg.geminiApiKey) {
+    cfg.apiKey = cfg.geminiApiKey
+  }
   const apiKey = cfg.providerType === 'gemini' ? cfg.geminiApiKey : cfg.apiKey
   return {
     providerType: cfg.providerType,
