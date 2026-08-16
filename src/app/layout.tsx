@@ -1,15 +1,22 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Cairo, Tajawal } from "next/font/google";
+import { Cairo, Tajawal } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { Providers } from "@/components/providers";
 import { ServiceWorkerRegistrar } from "@/components/service-worker-registrar";
 
-const inter = Inter({
+const inter = localFont({
+  src: [
+    { path: "../../public/fonts/inter-400.woff2", weight: "400", style: "normal" },
+    { path: "../../public/fonts/inter-500.woff2", weight: "500", style: "normal" },
+    { path: "../../public/fonts/inter-600.woff2", weight: "600", style: "normal" },
+    { path: "../../public/fonts/inter-700.woff2", weight: "700", style: "normal" },
+    { path: "../../public/fonts/inter-800.woff2", weight: "800", style: "normal" },
+  ],
   variable: "--font-inter",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
 });
 
 const cairo = Cairo({
