@@ -94,49 +94,139 @@ export function CompanionView() {
     setMessages((m) => [...m, userMsg])
     setInput('')
     try {
-      const result = await chat.mutateAsync({ message, conversationId })
-      // Extract visible reply (strip action blocks)
-      let reply = result.reply || result.raw || ''
-      reply = reply.replace(/```action[\s\S]*?```/g, '').trim()
-      const aiMsg: ChatMessage = { role: 'assistant', content: reply, createdAt: new Date().toISOString() }
-      setMessages((m) => [...m, aiMsg])
-      // If an action was executed, show the result as a confirmation card
-      if (result.actionResult) {
-        const actionNote: ChatMessage = {
-          role: 'assistant',
-          content: `_${result.actionResult.executed ? '✓ ' + result.actionResult.detail : '⚠ ' + result.actionResult.detail}_`,
-          createdAt: new Date().toISOString(),
-        }
-        setMessages((m) => [...m, actionNote])
-        if (result.actionResult.executed) {
-          // Show undo toast for create_event / resolve_gap actions
-          if (result.actionResult.eventId && (result.action?.type === 'create_event' || result.action?.type === 'resolve_gap')) {
-            toast.success(result.actionResult.detail, {
-              duration: 6000,
-              action: {
-                label: 'Undo',
-                onClick: () => {
-                  apiFetch(`/api/timeline/${result.actionResult!.eventId}`, { method: 'DELETE' })
-                    .then(() => toast.success(t('companion.eventRemoved')))
-                    .catch(() => toast.error(t('companion.undoFailed')))
-                },
-              },
-            })
-          } else {
-            toast.success(result.actionResult.detail)
+      const startedAt = new Date()
+      // Streaming path: the server pushes SSE events as the AI generates text,
+      // so the user sees the reply character-by-character instead of waiting
+      // for the whole response (can take 30-60s on Gemini free tier).
+      const r = await apiFetch('/api/companion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, conversationId, stream: true }),
+      })
+      if (!r.ok || !r.body) throw new Error('stream not available')
+
+      // placeholder bubble that fills in live
+      setMessages((m) => [...m, { role: 'assistant', content: '', createdAt: startedAt.toISOString() }])
+      const reader = r.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let replyText = ''
+      let hasAction = false
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.startsWith('data:')) continue
+          const payload = line.slice(5).trim()
+          if (!payload) continue
+          try {
+            const ev = JSON.parse(payload) as {
+              type: string
+              text?: string
+              action?: { type: string; data?: unknown } | null
+              actionResult?: { executed: boolean; detail: string; eventId?: string } | null
+              error?: string
+            }
+            if (ev.type === 'reply' && typeof ev.text === 'string') {
+              replyText = ev.text.replace(/```action[\s\S]*?```/g, '').trim()
+              setMessages((m) =>
+                m.map((x, i) =>
+                  i === m.length - 1 && x.role === 'assistant' ? { ...x, content: replyText } : x,
+                ),
+              )
+            } else if (ev.type === 'action' && ev.action) {
+              hasAction = true
+              if (ev.actionResult) {
+                const actionNote: ChatMessage = {
+                  role: 'assistant',
+                  content: `_${ev.actionResult.executed ? '✓ ' + ev.actionResult.detail : '⚠ ' + ev.actionResult.detail}_`,
+                  createdAt: new Date().toISOString(),
+                }
+                setMessages((m) => [...m, actionNote])
+                if (ev.actionResult.executed) {
+                  const evId = ev.actionResult.eventId
+                  const evType = ev.action.type
+                  if (evId && (evType === 'create_event' || evType === 'create_events' || evType === 'resolve_gap')) {
+                    toast.success(ev.actionResult.detail, {
+                      duration: 6000,
+                      action: evId
+                        ? {
+                            label: 'Undo',
+                            onClick: () =>
+                              apiFetch(`/api/timeline/${evId}`, { method: 'DELETE' })
+                                .then(() => toast.success(t('companion.eventRemoved')))
+                                .catch(() => toast.error(t('companion.undoFailed'))),
+                          }
+                        : undefined,
+                    })
+                  } else {
+                    toast.success(ev.actionResult.detail)
+                  }
+                }
+              } else {
+                const actionNote: ChatMessage = {
+                  role: 'assistant',
+                  content: `_${formatActionNote(ev.action)}_`,
+                  createdAt: new Date().toISOString(),
+                }
+                setMessages((m) => [...m, actionNote])
+              }
+            } else if (ev.type === 'error') {
+              throw new Error(ev.error ?? 'Unknown error')
+            }
+          } catch (e) {
+            if (e instanceof Error && e.message !== 'Unknown error') throw e
           }
         }
-      } else if (result.action && result.action.type !== 'answer') {
-        // Fallback for actions that didn't execute
-        const actionNote: ChatMessage = {
-          role: 'assistant',
-          content: `_${formatActionNote(result.action)}_`,
-          createdAt: new Date().toISOString(),
-        }
-        setMessages((m) => [...m, actionNote])
+      }
+      if (!replyText && !hasAction) {
+        throw new Error('empty response')
       }
     } catch {
-      toast.error(t('companion.noResponse'))
+      // Fallback: classic JSON call (older server / SSE unsupported)
+      try {
+        const result = await chat.mutateAsync({ message, conversationId })
+        let reply = result.reply || result.raw || ''
+        reply = reply.replace(/```action[\s\S]*?```/g, '').trim()
+        const aiMsg: ChatMessage = { role: 'assistant', content: reply, createdAt: new Date().toISOString() }
+        setMessages((m) => [...m, aiMsg])
+        if (result.actionResult) {
+          const actionNote: ChatMessage = {
+            role: 'assistant',
+            content: `_${result.actionResult.executed ? '✓ ' + result.actionResult.detail : '⚠ ' + result.actionResult.detail}_`,
+            createdAt: new Date().toISOString(),
+          }
+          setMessages((m) => [...m, actionNote])
+          if (result.actionResult.executed) {
+            if (result.actionResult.eventId && (result.action?.type === 'create_event' || result.action?.type === 'resolve_gap')) {
+              toast.success(result.actionResult.detail, {
+                duration: 6000,
+                action: {
+                  label: 'Undo',
+                  onClick: () =>
+                    apiFetch(`/api/timeline/${result.actionResult!.eventId}`, { method: 'DELETE' })
+                      .then(() => toast.success(t('companion.eventRemoved')))
+                      .catch(() => toast.error(t('companion.undoFailed'))),
+                },
+              })
+            } else {
+              toast.success(result.actionResult.detail)
+            }
+          }
+        } else if (result.action && result.action.type !== 'answer') {
+          const actionNote: ChatMessage = {
+            role: 'assistant',
+            content: `_${formatActionNote(result.action)}_`,
+            createdAt: new Date().toISOString(),
+          }
+          setMessages((m) => [...m, actionNote])
+        }
+      } catch {
+        toast.error(t('companion.noResponse'))
+      }
     }
   }
 

@@ -290,6 +290,175 @@ async function withFallbackModels<T>(
 }
 
 /**
+ * Parse a server-sent events body and collect all text fragments emitted by
+ * Gemini model_output steps. Used for streaming responses.
+ */
+export async function collectSseText(body: ReadableStream<Uint8Array>): Promise<string> {
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  const textParts: string[] = []
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? ''
+    for (const line of lines) {
+      if (line.startsWith('data:')) {
+        const payload = line.slice(5).trim()
+        if (!payload) continue
+        try {
+          const ev = JSON.parse(payload) as {
+            event_type?: string
+            interaction_id?: string
+            status?: string
+            step?: {
+              type?: string
+              content?: Array<{ type?: string; text?: string; audio?: string }>
+            }
+            interaction?: { output?: { text?: string } }
+          }
+          if (ev.step?.type === 'model_output' && ev.step.content) {
+            for (const part of ev.step.content) {
+              if (part.type === 'text' && part.text) textParts.push(part.text)
+            }
+          }
+          if (ev.interaction?.output?.text) textParts.push(ev.interaction.output.text)
+        } catch {
+          // skip malformed SSE frames
+        }
+      }
+    }
+  }
+  return textParts.join('').trim()
+}
+
+/**
+ * Streaming chat completion. Returns the full assistant reply text (collected
+ * from the SSE stream). The caller may also pass an onChunk callback to push
+ * incremental text to the client as it arrives.
+ * - 'gemini': Gemini interactions API with stream: true + ?alt=sse
+ * - 'openai': falls back to the non-streaming chat/completions path
+ */
+export async function chatCompletionStream(
+  messages: ChatMessage[],
+  onChunk?: (text: string) => void,
+): Promise<string> {
+  if (!isRemoteAIConfigured()) {
+    throw new Error('AI provider not configured (no API key)')
+  }
+
+  const cfg = getConfig()
+  if (cfg.providerType === 'gemini') {
+    return chatWithGeminiStream(messages, cfg.geminiApiKey, cfg.geminiModel, cfg.geminiFallbackModels, onChunk)
+  }
+  return chatWithOpenAI(messages, 0.7, cfg.apiKey, cfg.baseUrl, cfg.model)
+}
+
+async function chatWithGeminiStream(
+  messages: ChatMessage[],
+  geminiApiKey: string,
+  geminiModel: string,
+  geminiFallbackModels: string[],
+  onChunk?: (text: string) => void,
+): Promise<string> {
+  const input: Array<Record<string, unknown>> = messages.map((msg) => ({ type: 'text', text: msg.content }))
+
+  const doStream = async (model: string): Promise<string> => {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/interactions?alt=sse`, {
+      method: 'POST',
+      headers: {
+        'x-goog-api-key': geminiApiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        input,
+        stream: true,
+      }),
+    })
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '')
+      throw new Error(`Gemini stream failed (${res.status}): ${errText.slice(0, 200)}`)
+    }
+    const reader = res.body!.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    const textParts: string[] = []
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? ''
+      for (const line of lines) {
+        if (line.startsWith('data:')) {
+          const payload = line.slice(5).trim()
+          if (!payload) continue
+          try {
+            const ev = JSON.parse(payload) as {
+              step?: {
+                type?: string
+                content?: Array<{ type?: string; text?: string; audio?: string }>
+              }
+            }
+            const evType = (ev as { event_type?: string }).event_type
+
+            // Gemini Interactions SSE: text arrives in 'step.delta' events and the
+            // full interaction finishes with 'interaction.completed'.
+            if (evType === 'step.delta') {
+              const delta = (ev as { step?: { content?: Array<{ type?: string; text?: string }> } }).step?.content
+              if (delta) {
+                for (const part of delta) {
+                  if (part.type === 'text' && part.text) {
+                    textParts.push(part.text)
+                    onChunk?.(textParts.join(''))
+                  }
+                }
+              }
+            } else if (evType === 'interaction.completed') {
+              const outputText = (ev as { interaction?: { output?: { text?: string } } }).interaction?.output?.text
+              if (outputText && textParts.length === 0) textParts.push(outputText)
+            }
+            // Older server formats: full steps or final interaction payload
+            if (ev.step?.type === 'model_output' && ev.step.content) {
+              for (const part of ev.step.content) {
+                if (part.type === 'text' && part.text) textParts.push(part.text)
+              }
+            }
+            const finalText = (ev as { interaction?: { output?: { text?: string } } }).interaction?.output?.text
+            if (finalText) {
+              textParts.push(finalText as string)
+            }
+          } catch {
+            // skip malformed SSE frames
+          }
+        }
+      }
+    }
+    return textParts.join('').trim()
+  }
+
+  // Primary model, then fallback models on quota errors (same policy as non-stream)
+  try {
+    return await withRetry(() => doStream(geminiModel), { label: 'رد المساعد الذكي' })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    const isQuota = /429|Quota exceeded|quota/.test(msg)
+    if (!isQuota || geminiFallbackModels.length === 0) throw err
+    for (const model of geminiFallbackModels) {
+      try {
+        return await withRetry(() => doStream(model), { label: `رد المساعد الذكي (${model})` })
+      } catch (e) {
+        if (!/429|Quota exceeded|quota/.test(e instanceof Error ? e.message : String(e))) throw e
+      }
+    }
+    throw err
+  }
+}
+
+/**
  * Chat completion using the active remote provider (non-streaming).
  * - 'openai': POST /v1/chat/completions (OpenAI chat format)
  * - 'gemini': Gemini interactions API (text + optional audio input)

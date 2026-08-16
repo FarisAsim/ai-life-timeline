@@ -1,4 +1,4 @@
-import { chatCompletion, isRemoteAIConfigured } from '@/lib/ai-provider'
+import { chatCompletion, chatCompletionStream, isRemoteAIConfigured } from '@/lib/ai-provider'
 import { db } from '@/lib/db'
 import { format } from 'date-fns'
 import { listEventsForRange, createEvent, updateEvent } from './timeline-service'
@@ -13,8 +13,23 @@ CRITICAL LANGUAGE RULE:
 - NEVER switch to English when the user spoke Arabic. NEVER use Modern Standard Arabic when the user used Egyptian colloquial.
 - For event titles created via actions: use the SAME language the user spoke. If they said "جيم", the title must be "جيم", not "Gym" or "صالة رياضية".
 
-SMART EVENT CREATION — ASK BEFORE CREATING:
-- When the user mentions an activity but doesn't specify the TIME, DO NOT create the event yet. Instead, ASK them for the time.
+SMART EVENT CREATION:
+- MULTIPLE EVENTS IN ONE MESSAGE:
+- When the user recounts a day or mentions SEVERAL activities in one message, you MUST create ONE event per activity. Extract every distinct activity with its own time range.
+- NEVER collapse multiple activities into a single event. "I woke up at 12, then ate breakfast and talked to mom for an hour, then worked on the app for an hour, then played games" = 3 events: (1) breakfast+talking with mom 12:00-13:00, (2) worked on the app 13:00-14:00, (3) played games 14:00-now.
+- To create multiple events at once, use the create_events action (an ARRAY of events):
+
+\`\`\`action
+{ "type": "create_events", "events": [
+  { "title": "...", "startTime": "ISO 8601", "endTime": "ISO 8601", "categoryName": "..." },
+  { "title": "...", "startTime": "ISO 8601", "endTime": "ISO 8601", "categoryName": "..." }
+] }
+\`\`\`
+
+- Chain the time ranges so they do not overlap: the next event starts exactly when the previous one ends. If the user doesn't give a start time for a later activity, assume it starts right after the previous one ended.
+- If an activity's time is completely unknown and cannot be inferred from context, ask the user about that specific activity's time instead of guessing.
+
+When the user mentions an activity but doesn't specify the TIME, DO NOT create the event yet. Instead, ASK them for the time.
   Examples:
   User: "انا رايح الجيم" → You: "تمام! رايح الجيم امتى؟" (don't create yet)
   User: "I'm going to the gym" → You: "Great! What time are you going?" (don't create yet)
@@ -77,18 +92,22 @@ export interface CompanionContext {
 
 export async function buildUserContext(userId: string, userTimezone: string): Promise<string> {
   const now = new Date()
-  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-  const events = await listEventsForRange(userId, weekAgo.toISOString(), now.toISOString())
-  const blocks = await listOpenBlocks(userId)
+  // Shorter window + fewer events → much smaller prompt → faster Gemini response
+  const windowStart = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000)
+  const [events, blocks] = await Promise.all([
+    listEventsForRange(userId, windowStart.toISOString(), now.toISOString()),
+    listOpenBlocks(userId),
+  ])
 
+  const fmt = (d: Date) => d.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
   const eventLines = events.slice(0, 40).map((e) => {
-    const start = format(new Date(e.startTime), 'EEE MMM d, h:mm a')
-    const end = format(new Date(e.endTime), 'h:mm a')
+    const start = fmt(new Date(e.startTime))
+    const end = fmt(new Date(e.endTime))
     return `- id=${e.id} | ${start} – ${end}: "${e.title}" [category: ${e.category?.name ?? 'none'}] [source: ${e.source}]`
   })
   const blockLines = blocks.slice(0, 10).map((b) => {
-    const start = format(new Date(b.startTime), 'EEE MMM d, h:mm a')
-    const end = format(new Date(b.endTime), 'h:mm a')
+    const start = fmt(new Date(b.startTime))
+    const end = fmt(new Date(b.endTime))
     return `- id=${b.id} | ${start} – ${end} (gap of ${Math.round(b.durationMinutes / 60)}h${Math.round(b.durationMinutes % 60)}m, severity: ${b.severity})`
   })
 
@@ -107,8 +126,9 @@ export interface CompanionResponse {
   actionResult: { executed: boolean; detail: string; eventId?: string } | null
 }
 
-export async function chat(userId: string, conversationId: string | null, userMessage: string, userTimezone: string): Promise<CompanionResponse> {
-  const context = await buildUserContext(userId, userTimezone)
+export async function chat(userId: string, conversationId: string | null, userMessage: string, userTimezone: string, onChunk?: (text: string) => void): Promise<CompanionResponse> {
+  // Run DB reads in parallel to cut perceived latency
+  const contextPromise = buildUserContext(userId, userTimezone)
 
   // Load or create conversation
   let conversation: { id: string; messages: { role: string; content: string }[] } | null = null
@@ -126,6 +146,7 @@ export async function chat(userId: string, conversationId: string | null, userMe
     conversation = { id: conv.id, messages: [] }
   }
 
+  const context = await contextPromise
   const history = conversation.messages.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }))
 
   const messages = [
@@ -140,7 +161,9 @@ export async function chat(userId: string, conversationId: string | null, userMe
     raw = noAIReply(userMessage)
   } else {
     try {
-      raw = await chatCompletion(messages)
+      // Streaming from Gemini: full response time is unchanged, but the client
+      // sees incremental text as soon as it arrives instead of waiting 30-60s.
+      raw = await chatCompletionStream(messages, onChunk)
     } catch (err) {
       const msg = err instanceof Error ? err.message : ''
       if (/RATE_LIMIT|429|quota|rate|RESOURCE_EXHAUSTED/i.test(msg)) {
@@ -198,9 +221,43 @@ async function executeAction(
     eventId?: string
     blockId?: string
     text?: string
+    events?: unknown[]
   }
   try {
     switch (action.type) {
+      case 'create_events': {
+        // Batch: one call may carry several events (day recap etc.)
+        const events = Array.isArray(d.events) ? (d.events as Record<string, unknown>[]) : []
+        if (events.length === 0) return { executed: false, detail: 'events array is empty' }
+        // Resolve all categories in a single query (avoid N+1)
+        const names = [...new Set(events.map((e) => e.categoryName).filter((n): n is string => typeof n === 'string'))] as string[]
+        let cats: { name: string; id: string }[] = []
+        if (names.length > 0) {
+          cats = await db.category.findMany({ where: { userId, name: { in: names } } })
+        }
+        const catByName = new Map(cats.map((c) => [c.name, c.id]))
+        const created: string[] = []
+        for (const e of events as Record<string, unknown>[]) {
+          if (!e.title || !e.startTime || !e.endTime) continue
+          const categoryId = (e.categoryId as string | null | undefined) ?? (e.categoryName ? (catByName.get(e.categoryName as string) ?? null) : null)
+          try {
+            const event = await createEvent(userId, {
+              title: String(e.title),
+              startTime: String(e.startTime),
+              endTime: String(e.endTime),
+              categoryId: categoryId ?? null,
+              description: e.description ? String(e.description) : undefined,
+              source: 'ai_confirmed',
+              confidenceScore: 0.8,
+            })
+            created.push(event.title)
+          } catch (err) {
+            // skip overlapping/invalid events so the rest still get created
+            created.push(`${String(e.title)} (failed: ${err instanceof Error ? err.message.slice(0, 80) : 'err'})`)
+          }
+        }
+        return { executed: true, detail: `Created ${created.length} events: ${created.join(', ')}` }
+      }
       case 'create_event': {
         if (!d.title || !d.startTime || !d.endTime) {
           return { executed: false, detail: 'Missing title, startTime, or endTime' }
