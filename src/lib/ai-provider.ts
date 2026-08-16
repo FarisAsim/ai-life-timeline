@@ -404,6 +404,9 @@ async function chatWithGeminiStream(
               }
             }
             const evType = (ev as { event_type?: string }).event_type
+            // Temporary debug: dump raw SSE payload to runtime logs so we can see
+            // exactly which events Google sends in production.
+            console.log('[sse-debug]', evType, JSON.stringify(ev).slice(0, 300))
 
             // Gemini Interactions SSE: text arrives in 'step.delta' events and the
             // full interaction finishes with 'interaction.completed'.
