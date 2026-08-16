@@ -61,7 +61,7 @@ jobs:
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           NODE_OPTIONS: --max-old-space-size=4096
@@ -72,3 +72,20 @@ jobs:
           releaseBody: 'Desktop build of AI Life Timeline.'
           releaseDraft: false
           prerelease: false
+
+  publish-release:
+    if: always()
+    needs: build-desktop
+    runs-on: ubuntu-latest
+    steps:
+      - name: Finalize draft release
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          RELEASE_ID=$(gh api repos/FarisAsim/ai-life-timeline/releases --jq '.[] | select(.draft==true and .tag_name=="${{ github.ref_name }}") | .id' | head -1)
+          if [ -n "$RELEASE_ID" ]; then
+            gh api -X PATCH repos/FarisAsim/ai-life-timeline/releases/$RELEASE_ID -f draft=false
+            echo "Published release $RELEASE_ID"
+          else
+            echo "No draft release found, nothing to do"
+          fi
