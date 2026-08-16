@@ -56,8 +56,6 @@ export function isRemoteAIConfigured(): boolean {
 const TRANSCRIBE_PROMPT =
   'Write down exactly what is said in this audio, word for word, in the language used (it may be Arabic, Egyptian dialect, or any other language). Do not translate, do not summarize, do not add commentary — output only the raw transcript.'
 
-const FFMPEG_PATH = process.env.FFMPEG_PATH ?? 'ffmpeg'
-
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 /**
@@ -113,34 +111,12 @@ async function withRetry<T>(
   throw lastError ?? new Error(`AI_ERROR:${ctx.label}:حدث خطأ غير معروف في خدمة الذكاء الاصطناعي.`)
 }
 
-/** Convert any supported audio (base64) to audio/opus via ffmpeg. */
-async function convertToOpus(base64Audio: string): Promise<string> {
-  const { spawn } = await import('node:child_process')
-  const buffer = Buffer.from(base64Audio, 'base64')
-  return new Promise<string>((resolve, reject) => {
-    const proc = spawn(FFMPEG_PATH, [
-      '-hide_banner', '-loglevel', 'error',
-      '-i', 'pipe:0',
-      '-c:a', 'libopus', '-b:a', '48k',
-      '-f', 'opus',
-      'pipe:1',
-    ])
-    const chunks: Buffer[] = []
-    proc.stdout.on('data', (c: Buffer) => chunks.push(c))
-    proc.stderr.on('data', () => {})
-    proc.on('error', reject)
-    proc.on('close', (code) => {
-      if (code !== 0) return reject(new Error(`ffmpeg conversion failed (exit ${code})`))
-      resolve(Buffer.concat(chunks).toString('base64'))
-    })
-    proc.stdin.end(buffer)
-  })
-}
-
 /**
  * Transcribe audio (base64 webm/m4a) to text using the active remote provider.
- * - 'openai': POST /v1/audio/transcriptions (multipart)
- * - 'gemini': Gemini audio understanding (inline base64 opus, via interactions API)
+ * - 'openai': POST /v1/audio/transcriptions (multipart, webm/mp4)
+ * - 'gemini': Gemini audio understanding (inline base64 audio/wav, via interactions API).
+ *   The browser converts the microphone recording to 16kHz mono WAV via the
+ *   Web Audio API before sending — no server-side ffmpeg/child_process needed.
  */
 export async function transcribeAudio(base64Audio: string): Promise<{ text: string }> {
   if (!isRemoteAIConfigured()) {
@@ -208,8 +184,7 @@ async function transcribeWithGemini(
   geminiApiKey: string,
   geminiModel: string,
 ): Promise<{ text: string }> {
-  // Gemini interactions API does not support audio/webm — convert to audio/opus first.
-  const opusBase64 = await convertToOpus(base64Audio)
+  // Audio is pre-converted to WAV (16kHz mono) by the browser; Gemini supports audio/wav.
 
   const res = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
     method: 'POST',
@@ -221,7 +196,7 @@ async function transcribeWithGemini(
       model: geminiModel,
       input: [
         { type: 'text', text: TRANSCRIBE_PROMPT },
-        { type: 'audio', data: opusBase64, mime_type: 'audio/opus' },
+        { type: 'audio', data: base64Audio, mime_type: 'audio/wav' },
       ],
     }),
   })

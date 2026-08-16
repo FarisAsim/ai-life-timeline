@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useCategories, useCreateEvent } from '@/hooks/use-data'
 import { useTranslation } from '@/hooks/use-translation'
+import { blobToWavDataUrl } from '@/lib/audio-to-wav'
 
 interface VoiceCaptureDialogProps {
   open: boolean
@@ -38,6 +39,7 @@ export function VoiceCaptureDialog({ open, onOpenChange }: VoiceCaptureDialogPro
   const [editingTitle, setEditingTitle] = useState('')
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
+
   const { data: categories } = useCategories()
   const createMut = useCreateEvent()
   const { t, locale } = useTranslation()
@@ -56,9 +58,8 @@ export function VoiceCaptureDialog({ open, onOpenChange }: VoiceCaptureDialogPro
         // Inline the audio processing to avoid forward reference
         setTranscribing(true)
         setError(null)
-        const reader = new FileReader()
-        reader.onloadend = async () => {
-          const dataUrl = reader.result as string
+        blobToWavDataUrl(blob)
+          .then(async (dataUrl) => {
           try {
             const r = await apiFetch('/api/voice-capture', {
               method: 'POST',
@@ -88,9 +89,8 @@ export function VoiceCaptureDialog({ open, onOpenChange }: VoiceCaptureDialogPro
             setMode('text')
           }
           setTranscribing(false)
-        }
-        reader.onerror = () => { setError(t('voice.capture.readFailed')); setTranscribing(false) }
-        reader.readAsDataURL(blob)
+          })
+          .catch(() => { setError(t('voice.capture.readFailed')); setTranscribing(false) })
       }
       recorder.start()
       mediaRecorderRef.current = recorder

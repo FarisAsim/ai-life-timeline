@@ -16,6 +16,7 @@ import {
 import ReactMarkdown from 'react-markdown'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/hooks/use-translation'
+import { blobToWavDataUrl } from '@/lib/audio-to-wav'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -259,23 +260,20 @@ export function CompanionView() {
   const transcribe = async (blob: Blob) => {
     setTranscribing(true)
     try {
-      const reader = new FileReader()
-      reader.onloadend = async () => {
-        const base64 = reader.result as string
-        const r = await apiFetch('/api/voice', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ audio: base64 }),
-        })
-        const j = await r.json()
-        if (j.text) {
-          setInput(j.text)
-        } else {
-          toast.error(t('companion.transcribeError'))
-        }
-        setTranscribing(false)
+      // Convert webm → 16kHz mono WAV in the browser (Gemini accepts audio/wav)
+      const audioDataUrl = await blobToWavDataUrl(blob)
+      const r = await apiFetch('/api/voice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audio: audioDataUrl }),
+      })
+      const j = await r.json()
+      if (j.text) {
+        setInput(j.text)
+      } else {
+        toast.error(t('companion.transcribeError'))
       }
-      reader.readAsDataURL(blob)
+      setTranscribing(false)
     } catch {
       toast.error(t('companion.transcribeFailed'))
       setTranscribing(false)
