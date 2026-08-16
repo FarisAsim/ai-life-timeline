@@ -68,11 +68,22 @@ jobs:
         with:
           args: ${{ matrix.args }}
 
+      - name: Find and list bundle files
+        id: bundles
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem -Path src-tauri/target -Recurse -File |
+            Where-Object { $_.DirectoryName -match '[\\/]release[\\/]bundle[\\/]' -and $_.Extension -ne '.sig' -and $_.Name -notlike '*.zip' }
+          $list = ($files | ForEach-Object { $_.FullName }) -join "`n"
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "files<<EOF`n$list`nEOF"
+          Write-Output "Found $($files.Count) bundle files"
+          $files | ForEach-Object { Write-Output $_.FullName }
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: tauri-${{ matrix.platform }}
-          path: src-tauri/target/**/release/bundle/**/!(*.sig|*.zip)
+          path: ${{ steps.bundles.outputs.files }}
           if-no-files-found: error
 
   publish-release:
@@ -82,10 +93,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+
       - name: Create or update release and upload files
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
