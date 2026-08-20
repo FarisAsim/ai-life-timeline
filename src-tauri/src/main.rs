@@ -25,24 +25,43 @@ fn pick_free_port() -> u16 {
 fn launch_next_server() -> (u16, std::process::Child) {
     let port = pick_free_port();
 
-    // Resolve paths relative to this binary's location (works for installed app)
-    // and fall back to repo paths when running via `cargo tauri dev`.
-    let resource_dir = env::current_exe()
-        .ok()
-        .and_then(|p| p.parent().map(|p| p.to_path_buf()))
-        .unwrap_or_else(|| PathBuf::from("."));
+    // 1) Packaged app: use Tauri's resource resolver (works for NSIS/MSI/DMG installs).
+    //    resources globs map to their relative structure under the install dir.
+    let server_js = if let Ok(p) = app_handle_path_resolve("server.js") {
+        p
+    } else {
+        // 2) Fallback: repo checkout (cargo tauri dev)
+        let repo = env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+            .unwrap_or_else(|| PathBuf::from("."));
+        repo.join("..")
+            .join("..")
+            .join(".next")
+            .join("standalone")
+            .join("server.js")
+    };
+    if !server_js.exists() {
+        panic!("Next.js standalone server.js not found at {:?}", server_js);
+    }
 
-    let candidates = vec![
-        resource_dir.join("server").join("server.js"),
-        resource_dir.join("..").join("..").join(".next").join("standalone").join("server.js"),
-    ];
+    // 3) Node binary: bundled node.exe (from resources) or system node
+    let node_bin = if let Ok(p) = app_handle_path_resolve("node.exe") {
+        p.to_string_lossy().to_string()
+    } else {
+        let repo = env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+            .unwrap_or_else(|| PathBuf::from("."));
+        let bundled = repo.join("..").join("node.exe");
+        if bundled.exists() {
+            bundled.to_string_lossy().to_string()
+        } else {
+            "node".to_string()
+        }
+    };
 
-    let server_js = candidates
-        .into_iter()
-        .find(|p| p.exists())
-        .expect("Next.js standalone server.js not found");
-
-    let mut cmd = Command::new("node");
+    let mut cmd = Command::new(&node_bin);
     cmd.arg(&server_js)
         .env("PORT", port.to_string())
         .env("NODE_ENV", "production")
@@ -70,8 +89,61 @@ fn launch_next_server() -> (u16, std::process::Child) {
     (port, child)
 }
 
+/// Resolve a bundled resource path relative to the app's resource dir,
+/// without needing an `AppHandle` (we are not inside setup yet).
+fn app_handle_path_resolve(rel: &str) -> Result<PathBuf, ()> {
+    let base = env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+        .ok_or(())?;
+    // Tauri installs resources next to the app binary preserving relative
+    // structure from the resource dir (src-tauri for direct globs).
+    let direct = base.join("resources").join(rel);
+    if direct.exists() {
+        return Ok(direct);
+    }
+    // On Windows installs, resources may sit directly next to the exe
+    // (e.g. node.exe was `resources/node.exe` -> installed as <appdir>/resources/node.exe
+    //  or stripped to <appdir>/node.exe depending on bundle). Try both.
+    let flat = base.join(rel);
+    if flat.exists() {
+        return Ok(flat);
+    }
+    Err(())
+}
+
+#[cfg(windows)]
+fn attach_kill_on_close(child: &mut std::process::Child) {
+    // Ensure the Node child exits when the Tauri app closes (no zombies).
+    use std::os::windows::io::AsRawHandle;
+    unsafe {
+        use windows_sys::Win32::System::JobObjects::*;
+        let job = CreateJobObjectW(std::ptr::null(), std::ptr::null());
+        if job.is_null() {
+            return;
+        }
+        let mut info: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = std::mem::zeroed();
+        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        SetInformationJobObject(
+            job,
+            JobObjectExtendedLimitInformation,
+            &info as *const _ as *const _,
+            std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+        );
+        AssignProcessToJobObject(job, child.as_raw_handle());
+        // Leak the job handle so it stays alive until process exit,
+        // at which point Windows closes it and kills the job.
+        std::mem::forget(job);
+    }
+}
+
 fn main() {
-    let (port, _child) = launch_next_server();
+    #[allow(unused_mut)]
+    let (port, mut child) = launch_next_server();
+    #[cfg(windows)]
+    attach_kill_on_close(&mut child);
+    #[cfg(not(windows))]
+    let _ = child;
     let url = format!("http://127.0.0.1:{}", port);
 
     tauri::Builder::default()
