@@ -89,6 +89,31 @@ fn launch_next_server() -> (u16, std::process::Child) {
     (port, child)
 }
 
+/// Best-effort: kill the Node child when the Tauri app exits, so no
+/// orphaned node.exe processes are left behind on Windows.
+#[cfg(windows)]
+fn kill_child_on_exit(child: &mut std::process::Child) {
+    let pid = child.id();
+    std::thread::spawn(move || {
+        struct Sentinel { pid: u32 }
+        impl Drop for Sentinel {
+            fn drop(&mut self) {
+                // Windows: force-kill the child process on exit.
+                let _ = std::process::Command::new("taskkill")
+                    .args(["/PID", &self.pid.to_string(), "/F"])
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .status();
+            }
+        }
+        let _sentinel = Sentinel { pid };
+        // Keep the sentinel alive until the process tears down.
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(10));
+        }
+    });
+}
+
 /// Resolve a bundled resource path relative to the app's resource dir,
 /// without needing an `AppHandle` (we are not inside setup yet).
 fn app_handle_path_resolve(rel: &str) -> Result<PathBuf, ()> {
@@ -112,36 +137,11 @@ fn app_handle_path_resolve(rel: &str) -> Result<PathBuf, ()> {
     Err(())
 }
 
-#[cfg(windows)]
-fn attach_kill_on_close(child: &mut std::process::Child) {
-    // Ensure the Node child exits when the Tauri app closes (no zombies).
-    use std::os::windows::io::AsRawHandle;
-    unsafe {
-        use windows_sys::Win32::System::JobObjects::*;
-        let job = CreateJobObjectW(std::ptr::null(), std::ptr::null());
-        if job.is_null() {
-            return;
-        }
-        let mut info: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = std::mem::zeroed();
-        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-        SetInformationJobObject(
-            job,
-            JobObjectExtendedLimitInformation,
-            &info as *const _ as *const _,
-            std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
-        );
-        AssignProcessToJobObject(job, child.as_raw_handle());
-        // Leak the job handle so it stays alive until process exit,
-        // at which point Windows closes it and kills the job.
-        std::mem::forget(job);
-    }
-}
-
 fn main() {
     #[allow(unused_mut)]
     let (port, mut child) = launch_next_server();
     #[cfg(windows)]
-    attach_kill_on_close(&mut child);
+    kill_child_on_exit(&mut child);
     #[cfg(not(windows))]
     let _ = child;
     let url = format!("http://127.0.0.1:{}", port);
