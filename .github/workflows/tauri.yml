@@ -57,26 +57,20 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
         with:
           args: ${{ matrix.args }}
-      - name: Find bundle files and upload
+      - name: Package build artifacts
         shell: bash
         run: |
+          mkdir -p ~/bundles
           find src-tauri/target -type f \
             -path "*release/bundle/*" \
-            ! -name "*.sig" ! -name "*.zip" -print > /tmp/bundle-files.txt
-          echo "Bundle files found: $(wc -l < /tmp/bundle-files.txt)"
-          cat /tmp/bundle-files.txt
-          if [ -s /tmp/bundle-files.txt ]; then
-            mkdir -p /tmp/bundles
-            while IFS= read -r f; do
-              cp "$f" "/tmp/bundles/$(basename "$f")"
-            done < /tmp/bundle-files.txt
-          fi
+            ! -name "*.sig" ! -name "*.zip" -exec cp {} ~/bundles/ \;
+          ls -la ~/bundles/
       - name: Upload build artifacts
         if: matrix.platform != 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
           name: tauri-${{ matrix.platform }}
-          path: /tmp/bundles/*
+          path: ~/bundles/*
           if-no-files-found: error
   publish-release:
     needs: build-desktop
